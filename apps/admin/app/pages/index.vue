@@ -30,8 +30,11 @@ async function onLogout() {
         <p class="text-sm text-gray-500">Capabilities: {{ me?.capabilities.join(", ") }}</p>
       </UCard>
 
-      <UCard>
-        <NuxtLink to="/posts" class="text-primary hover:underline">Kelola Posts →</NuxtLink>
+      <UCard class="flex flex-wrap gap-4">
+        <NuxtLink to="/posts" class="text-primary hover:underline">Posts →</NuxtLink>
+        <NuxtLink to="/media" class="text-primary hover:underline">Media →</NuxtLink>
+        <NuxtLink to="/categories" class="text-primary hover:underline">Categories →</NuxtLink>
+        <NuxtLink to="/tags" class="text-primary hover:underline">Tags →</NuxtLink>
       </UCard>
     </main>
   </div>

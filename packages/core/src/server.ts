@@ -3,10 +3,15 @@
 export * from "./auth/password";
 export * from "./db/client";
 export * from "./domain/content/index";
+export * from "./domain/media/index";
+export * from "./domain/taxonomy/index";
 export * from "./domain/users/index";
 
 import { db } from "./db/client";
 import { ContentService } from "./domain/content/content-service";
+import { LocalDiskStorage } from "./domain/media/local-disk-storage";
+import { MediaService } from "./domain/media/media-service";
+import { TaxonomyService } from "./domain/taxonomy/taxonomy-service";
 import { PermissionService } from "./domain/users/permission-service";
 import { RoleService } from "./domain/users/role-service";
 import { UserService } from "./domain/users/user-service";
@@ -15,3 +20,7 @@ export const userService = new UserService(db);
 export const roleService = new RoleService(db);
 export const permissionService = new PermissionService(roleService, userService);
 export const contentService = new ContentService(db);
+export const taxonomyService = new TaxonomyService(db);
+
+const mediaStorage = new LocalDiskStorage(process.env.MEDIA_LOCAL_PATH ?? "../../data/media");
+export const mediaService = new MediaService(db, mediaStorage);

@@ -1,4 +1,4 @@
-import { contentService } from "@selftaught/core/server";
+import { contentService, mediaService, taxonomyService } from "@selftaught/core/server";
 
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, "slug");
@@ -10,5 +10,11 @@ export default defineEventHandler(async (event) => {
   if (!post || post.status !== "published") {
     throw createError({ statusCode: 404, statusMessage: "Post not found" });
   }
-  return post;
+
+  const [terms, featuredMedia] = await Promise.all([
+    taxonomyService.termsForContent(post.id),
+    post.featuredMediaId ? mediaService.getByIdWithUrl(post.featuredMediaId) : null
+  ]);
+
+  return { ...post, terms, featuredMediaUrl: featuredMedia?.url ?? null };
 });

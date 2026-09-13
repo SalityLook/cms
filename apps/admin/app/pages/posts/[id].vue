@@ -12,12 +12,27 @@ if (!post.value) {
   throw createError({ statusCode: 404, statusMessage: "Post not found" });
 }
 
+const { data: mediaItems } = await useFetch("/api/media");
+const { data: categories } = await useFetch("/api/taxonomy/category");
+const { data: tags } = await useFetch("/api/taxonomy/tag");
+
 const title = ref(post.value.title);
 const slug = ref(post.value.slug);
 const excerpt = ref(post.value.excerpt ?? "");
 const doc = ref<ContentDocument>(post.value.content as ContentDocument);
+const featuredMediaId = ref<string | null>(post.value.featuredMediaId);
+const selectedTermIds = ref<string[]>(post.value.terms.map((term) => term.id));
 const saving = ref(false);
 const error = ref("");
+
+function toggleTerm(termId: string) {
+  const idx = selectedTermIds.value.indexOf(termId);
+  if (idx === -1) {
+    selectedTermIds.value.push(termId);
+  } else {
+    selectedTermIds.value.splice(idx, 1);
+  }
+}
 
 async function onSave() {
   error.value = "";
@@ -29,7 +44,9 @@ async function onSave() {
         title: title.value,
         slug: slug.value,
         excerpt: excerpt.value || undefined,
-        content: doc.value
+        content: doc.value,
+        featuredMediaId: featuredMediaId.value,
+        termIds: selectedTermIds.value
       }
     });
     await refresh();
@@ -88,6 +105,61 @@ async function onDelete() {
       </UCard>
 
       <BlockEditor v-model="doc" />
+
+      <UCard>
+        <h2 class="font-medium mb-3">Gambar Unggulan</h2>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="item in mediaItems"
+            :key="item.id"
+            type="button"
+            class="border-2 rounded-md overflow-hidden"
+            :class="featuredMediaId === item.id ? 'border-primary' : 'border-transparent'"
+            @click="featuredMediaId = featuredMediaId === item.id ? null : item.id"
+          >
+            <img :src="item.url" :alt="item.altText ?? ''" class="w-16 h-16 object-cover" >
+          </button>
+          <p v-if="!mediaItems?.length" class="text-gray-400 text-sm">
+            Belum ada media. Upload dulu di halaman <NuxtLink to="/media" class="underline">Media</NuxtLink>.
+          </p>
+        </div>
+      </UCard>
+
+      <UCard>
+        <h2 class="font-medium mb-3">Categories</h2>
+        <div class="flex flex-wrap gap-2 mb-4">
+          <UButton
+            v-for="cat in categories"
+            :key="cat.id"
+            size="xs"
+            :color="selectedTermIds.includes(cat.id) ? 'primary' : 'neutral'"
+            :variant="selectedTermIds.includes(cat.id) ? 'solid' : 'outline'"
+            @click="toggleTerm(cat.id)"
+          >
+            {{ cat.name }}
+          </UButton>
+          <p v-if="!categories?.length" class="text-gray-400 text-sm">
+            Belum ada category. Buat di halaman <NuxtLink to="/categories" class="underline">Categories</NuxtLink>.
+          </p>
+        </div>
+
+        <h2 class="font-medium mb-3">Tags</h2>
+        <div class="flex flex-wrap gap-2">
+          <UButton
+            v-for="tag in tags"
+            :key="tag.id"
+            size="xs"
+            :color="selectedTermIds.includes(tag.id) ? 'primary' : 'neutral'"
+            :variant="selectedTermIds.includes(tag.id) ? 'solid' : 'outline'"
+            @click="toggleTerm(tag.id)"
+          >
+            {{ tag.name }}
+          </UButton>
+          <p v-if="!tags?.length" class="text-gray-400 text-sm">
+            Belum ada tag. Buat di halaman <NuxtLink to="/tags" class="underline">Tags</NuxtLink>.
+          </p>
+        </div>
+      </UCard>
 
       <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
     </main>

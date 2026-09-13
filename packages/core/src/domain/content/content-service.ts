@@ -21,6 +21,7 @@ export interface UpdateContentInput {
   title?: string;
   excerpt?: string;
   content?: ContentDocument;
+  featuredMediaId?: string | null;
 }
 
 export interface ListContentFilters {

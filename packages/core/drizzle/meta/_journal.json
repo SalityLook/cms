@@ -15,6 +15,13 @@
       "when": 1789307026895,
       "tag": "0001_bouncy_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789307886086,
+      "tag": "0002_grey_weapon_omega",
+      "breakpoints": true
     }
   ]
 }

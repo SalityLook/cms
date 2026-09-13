@@ -1,12 +1,14 @@
 import { contentDocumentSchema } from "@selftaught/core";
-import { contentService } from "@selftaught/core/server";
+import { contentService, taxonomyService } from "@selftaught/core/server";
 import { z } from "zod";
 
 const bodySchema = z.object({
   slug: z.string().min(1).optional(),
   title: z.string().min(1).optional(),
   excerpt: z.string().optional(),
-  content: contentDocumentSchema.optional()
+  content: contentDocumentSchema.optional(),
+  featuredMediaId: z.string().uuid().nullable().optional(),
+  termIds: z.array(z.string().uuid()).optional()
 });
 
 export default defineEventHandler(async (event) => {
@@ -16,6 +18,11 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "Missing id" });
   }
 
-  const body = await readValidatedBody(event, bodySchema.parse);
-  return contentService.update(actor, id, body);
+  const { termIds, ...contentInput } = await readValidatedBody(event, bodySchema.parse);
+
+  const updated = await contentService.update(actor, id, contentInput);
+  if (termIds) {
+    await taxonomyService.assignTerms(id, termIds);
+  }
+  return updated;
 });

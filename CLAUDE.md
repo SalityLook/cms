@@ -32,9 +32,9 @@ tanpa perlu re-derive keputusan yang sudah diambil.
 
 - ✅ **Phase 0 — Scaffolding** (commit `1954957`)
 - ✅ **Phase 1 — Core schema + auth + RBAC** (commit `86e992e`)
-- ✅ **Phase 2 — Content CRUD + block editor** (lihat bagian di bawah)
-- ⬜ Phase 3 — Taxonomies + media (**berikutnya**)
-- ⬜ Phase 4 — Revisions + full publishing workflow
+- ✅ **Phase 2 — Content CRUD + block editor**
+- ✅ **Phase 3 — Taxonomies + media** (lihat bagian di bawah)
+- ⬜ Phase 4 — Revisions + full publishing workflow (**berikutnya**)
 - ⬜ Phase 5 — SEO subsystem
 - ⬜ Phase 6 — Frontend polish + theme layer
 - ⬜ Phase 7 — Hook/plugin system + example plugin
@@ -79,12 +79,23 @@ selftaught/
 │   │   ├── server/middleware/auth.ts    # resolve Actor fresh dari DB per /api/* request
 │   │   ├── server/utils/require-capability.ts
 │   │   └── shared/types/auth.d.ts       # augment #auth-utils User type (WAJIB di shared/, lihat Gotcha #3)
+│   │   ├── app/pages/{media,categories,tags}.vue  # media library + taxonomy CRUD
+│   │   ├── app/components/TaxonomyManager.vue     # shared component for categories.vue/tags.vue
+│   │   ├── server/api/media/{index,[id]}.{get,post,delete}.ts
+│   │   ├── server/api/taxonomy/[taxonomy]/{index,[id]}.{get,post,delete}.ts
+│   │   └── server/routes/media/[...path].get.ts   # serves uploaded files from MEDIA_LOCAL_PATH
 │   └── frontend/                # Nuxt 4, port 3001 — public site, extends themes/default
-│       ├── app/pages/index.vue, blog/index.vue, blog/[slug].vue
-│       └── server/api/posts/{index,[slug]}.get.ts  # read-only, hanya status=published
+│       ├── app/pages/index.vue, blog/{index,[slug]}.vue, category/[slug].vue, tag/[slug].vue
+│       ├── server/api/posts/{index,[slug]}.get.ts       # read-only, hanya status=published
+│       ├── server/api/{category,tag}/[slug].get.ts      # archive listing
+│       └── server/routes/media/[...path].get.ts         # SAME route as admin, same shared disk folder
 ├── themes/default/              # Nuxt Layer kosong (reference theme, diisi Phase 6)
 └── plugins/                     # kosong (Phase 7)
 ```
+
+`packages/core/src/domain/{taxonomy,media}/` menambahkan `TaxonomyService` dan
+`MediaService` + `StorageAdapter`/`LocalDiskStorage`; `packages/core/src/registry/taxonomies.ts`
+mendaftarkan taxonomy `category`/`tag`. Schema baru: `packages/core/src/db/schema/{taxonomy,media}.ts`.
 
 **Catatan penyimpangan kecil dari plan awal**: plan menyebut `packages/blocks/src/schema.ts`
 sebagai tempat definisi `BlockNode`/`ContentDocument`. Karena `ContentService` di
@@ -209,6 +220,22 @@ pnpm --filter @selftaught/core db:seed
     compiler SFC otomatis mendaftarkan komponen di bawah nama filename-nya.
     Tidak perlu `components: { BlockRenderer }` manual.
 
+11. **`MEDIA_LOCAL_PATH=../../data/media`** (bukan `./data/media`) — disengaja.
+    Path relatif ke `process.cwd()` masing-masing app, dan `apps/admin` +
+    `apps/frontend` sama-sama persis 2 level di bawah root, jadi `../../data/media`
+    resolve ke folder yang SAMA di disk untuk keduanya. Ini penting karena admin
+    yang upload file, tapi frontend yang harus bisa serve/render file yang sama
+    secara publik — kalau pakai `./data/media` tiap app akan punya folder
+    terpisah dan gambar yang diupload di admin akan 404 di frontend.
+
+12. **`media.id` (UUID baris DB) BUKAN sama dengan storage key/URL path-nya.**
+    `MediaService.upload()` generate `randomUUID()` terpisah sebagai nama file
+    fisik (`<random-uuid>.<ext>`), independen dari `media.id`. Jangan pernah
+    bikin URL manual seperti `` `/media/${featuredMediaId}` `` — itu akan 404.
+    Selalu resolve lewat `mediaService.getByIdWithUrl(id)` (atau field
+    `featuredMediaUrl` yang sudah di-resolve oleh endpoint post) untuk dapat URL
+    yang benar.
+
 ## Kredensial dev (lokal, dari seed)
 
 - Admin login: **admin@example.com** / **changeme123!**
@@ -253,38 +280,62 @@ frontend, 404) → publish (langsung tampil, block content ter-render benar:
 paragraph, heading h2) → unpublish → update title → delete. Semua lint+typecheck
 bersih di `core`/`blocks`/`admin`/`frontend`.
 
-## Cara lanjut ke Phase 3 (Taxonomies + media)
+## Ringkasan Phase 3 (selesai)
 
-Baca bagian "Phase 3" di plan file
+`terms`/`content_terms` + `media` tables (migration `0002_grey_weapon_omega.sql`),
+`TaxonomyRegistry` (category/tag terdaftar), `TaxonomyService`, `MediaService`
++ `LocalDiskStorage` (`StorageAdapter` interface, siap diganti S3 nanti tanpa
+ubah service), `sharp` untuk ekstrak width/height gambar. Admin: media library
+(`/media`, upload+delete), categories/tags CRUD (`/categories`, `/tags`, pakai
+komponen bersama `TaxonomyManager.vue`), featured-image picker + category/tag
+toggle di editor post (`posts/[id].vue`). Frontend: `/category/[slug]`,
+`/tag/[slug]` archive pages, featured image + term links tampil di
+`/blog/[slug]`. `content.featuredMediaId` dan `users.avatarMediaId` **tetap
+tanpa FK constraint eksplisit** (dibiarkan plain `uuid` kolom, referensi
+"lunak" ke `media.id`) supaya `schema/content.ts`/`users.ts` tidak perlu
+circular-import ke `schema/media.ts` — `avatarMediaId` sendiri belum
+ditambahkan sama sekali (di luar scope Phase 3, tidak ada fitur yang butuh).
+
+**Terverifikasi end-to-end via curl**: upload gambar (sharp baca dimensi
+benar) → file bisa di-serve dari KEDUA app (disk sharing lewat
+`MEDIA_LOCAL_PATH`) → buat category+tag → buat post → assign featured
+image+terms → publish → `/blog/[slug]` tampilkan gambar unggulan + link
+kategori/tag yang benar → `/category/[slug]` dan `/tag/[slug]` menampilkan
+post yang sesuai. Lint+typecheck bersih di semua package/app.
+
+## Cara lanjut ke Phase 4 (Revisions + full publishing workflow)
+
+Baca bagian "Phase 4" di plan file
 (`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`). Ringkas:
 
-1. `packages/core/src/db/schema/taxonomy.ts` — `terms` (taxonomy/slug/name/
-   parentId, unique(taxonomy, slug)) + `content_terms` (many-to-many ke `content`)
-2. `packages/core/src/db/schema/media.ts` — `media` table (fileName, mimeType,
-   sizeBytes, path, width/height, altText, uploadedById). Setelah ini ada,
-   tambahkan FK `content.featuredMediaId -> media.id` dan
-   `users.avatarMediaId -> media.id` lewat migration baru (kolomnya sudah ada
-   di schema `content`/`users` tapi belum di-reference — lihat komentar di plan
-   section domain design soal avatarMediaId yang sengaja ditunda)
-3. `TaxonomyService` (createTerm/assignTerms/listByTaxonomy) dan `MediaService`
-   + `StorageAdapter` interface (`LocalDiskStorage` dulu, path dari
-   `MEDIA_LOCAL_PATH` di `.env`) + `sharp` untuk thumbnail
-4. Admin: halaman categories/tags CRUD, media library + upload endpoint,
-   taxonomy/featured-image picker di editor post
-5. Frontend: `app/pages/category/[slug].vue`, `tag/[slug].vue`
+1. `packages/core/src/db/schema/revisions.ts` — tabel `revisions` (contentId,
+   authorId, title, excerpt, content jsonb, revisionType enum('revision','autosave'),
+   createdAt) — full snapshot, bukan diff
+2. `RevisionService` (snapshot on every save di `ContentService.update`, listRevisions,
+   restoreRevision — restore juga snapshot state SEBELUM restore sebagai revision baru)
+3. State machine penuh di `ContentService.transitionStatus`: `draft → pending →
+   published`, `draft → scheduled → published`, `any → trashed → draft/purge`.
+   `content_status` enum SUDAH punya semua value (`draft/pending/scheduled/
+   published/trashed`) sejak Phase 2 — tidak perlu ALTER TYPE, tinggal
+   diimplementasikan logic transisinya
+4. Nitro scheduled task `apps/admin/server/tasks/publish-scheduled.ts` — cron
+   tiap menit, query `content` where `status='scheduled' AND scheduledAt <= now()`,
+   transisi ke `published`. Daftarkan di `nuxt.config.ts` via
+   `nitro.scheduledTasks` + `nitro.experimental.tasks: true`
+5. Admin: tab Revisions di editor post (list + restore), tombol "Ajukan Review"
+   (draft→pending, capability `edit_posts`), "Jadwalkan" (input datetime →
+   draft/pending→scheduled, capability `publish_posts`), halaman Trash
+   (list status=trashed, restore/purge)
 
-Ikuti pola yang SUDAH ada: service class menerima `Database` di constructor,
-singleton di-expose lewat `packages/core/src/server.ts`, capability check dua
-lapis (`requireCapability` di API layer + assert di service layer), zod schema
-untuk validasi body request ditaruh di `packages/core/src/shared/` supaya bisa
-dipakai ulang oleh kedua app.
+Ikuti pola yang SUDAH ada: service menerima `Database` di constructor, singleton
+di `packages/core/src/server.ts`, capability check dua lapis. `RevisionService`
+sebaiknya dipanggil DARI `ContentService.update`/`transitionStatus` (bukan dari
+API layer terpisah) supaya setiap save selalu ter-snapshot tanpa bisa dilupakan
+oleh caller manapun.
 
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
-(bukan `--global`): `user.email=sisalamdev@gmail.com`. Commit history:
-
-```
-86e992e Phase 1: RBAC schema, auth, and protected admin dashboard shell
-1954957 Phase 0: scaffold SelfTaught CMS monorepo
-```
+(bukan `--global`): `user.email=sisalamdev@gmail.com`. Satu commit per fase —
+jalankan `git log --oneline` untuk daftar terkini (jangan andalkan daftar hash
+statis di dokumen ini, gampang basi).
