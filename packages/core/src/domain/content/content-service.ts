@@ -17,6 +17,8 @@ export interface CreateContentInput {
   title: string;
   excerpt?: string;
   content: ContentDocument;
+  parentId?: string | null;
+  menuOrder?: number;
 }
 
 export interface UpdateContentInput {
@@ -25,6 +27,8 @@ export interface UpdateContentInput {
   excerpt?: string;
   content?: ContentDocument;
   featuredMediaId?: string | null;
+  parentId?: string | null;
+  menuOrder?: number;
 }
 
 export interface ListContentFilters {
@@ -66,6 +70,8 @@ export class ContentService {
         excerpt: input.excerpt,
         content: input.content,
         authorId: actor.id,
+        parentId: input.parentId,
+        menuOrder: input.menuOrder,
         status: "draft"
       })
       .returning();

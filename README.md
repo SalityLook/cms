@@ -13,13 +13,18 @@ ProseMirror, TypeScript end-to-end).
 
 ## Fitur
 
-- **Content management** — post & block editor bergaya Gutenberg (Tiptap),
+- **Content management** — post & **page** (dengan hierarki parent/menu
+  order) pakai block editor bergaya Gutenberg (Tiptap),
   draft/pending review/scheduled/published/trashed dengan auto-publish via
   cron, dan full revision history (setiap perubahan tersimpan, bisa dipulihkan)
 - **Taxonomy & media** — categories, tags, media library dengan upload gambar
   (ekstraksi dimensi otomatis via `sharp`)
 - **RBAC** — role & capability granular (`admin`, `editor`, `author`,
-  `contributor` bawaan), enforcement dua lapis (API layer + service layer)
+  `contributor` bawaan), enforcement dua lapis (API layer + service layer),
+  lengkap dengan halaman admin `/users` & `/roles` untuk kelola user dan
+  lihat capability per role
+- **Automated tests** — `vitest` (unit test murni + integration test
+  terhadap Postgres asli, `pnpm test`)
 - **SEO** — meta title/description/canonical/OG image per-halaman dengan
   fallback ke default situs, JSON-LD structured data, `sitemap.xml` &
   `robots.txt` otomatis
@@ -156,6 +161,7 @@ pnpm db:studio              # Buka Drizzle Studio (GUI browser database)
 # Quality gates
 pnpm typecheck              # Typecheck seluruh package/app
 pnpm lint                   # Lint seluruh package/app
+pnpm test                   # Unit test + integration test (butuh db:migrate + db:seed dulu)
 ```
 
 ## Deployment produksi
@@ -254,7 +260,9 @@ ke `AdminUIRegistry`.
 
 Semua 8 fase roadmap awal (scaffolding, auth/RBAC, content & block editor,
 taxonomy & media, revisions & publishing workflow, SEO, theme layer, hook/
-plugin system) sudah selesai. Beberapa fitur turunan (CRUD untuk content type
-"page", halaman admin untuk mengelola Roles/Users, dsb.) sengaja belum
-dibangun — daftar lengkap beserta cara melanjutkannya ada di bagian akhir
-`CLAUDE.md`.
+plugin system) sudah selesai, ditambah tiga penyempurnaan pasca-roadmap:
+halaman admin Users & Roles, automated test suite, dan CRUD penuh untuk
+content type "page" (termasuk hierarki parent/menu order). Beberapa item
+kecil masih sengaja belum dibangun (static front page homepage, pembuatan
+role custom lewat UI, dsb.) — daftar lengkap beserta cara melanjutkannya ada
+di bagian akhir `CLAUDE.md`.

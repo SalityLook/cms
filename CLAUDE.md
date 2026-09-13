@@ -603,14 +603,14 @@ menjaga fase-fase tetap proporsional dalam satu sesi kerja panjang tanpa
 checkpoint approval. Ini bukan "belum sempat" — masing-masing sudah
 dipertimbangkan dan didokumentasikan di titik ia di-skip:
 
-1. **Content type "page" — CRUD admin/API belum ada** (Phase 2 & 6). Cuma
-   terdaftar di `ContentTypeRegistry`. Implementasi: copy persis pola
-   `apps/admin/server/api/posts/*` + `apps/admin/app/pages/posts/*` untuk
-   `/api/pages` + `/pages`, tanpa bagian categories/tags (tipe "page" tidak
-   punya taxonomy di `ContentTypeDefinition`), tambah picker `parentId` +
-   input `menuOrder` untuk hierarki halaman ala WordPress.
-2. **`settings.homepageContentId` (static front page)** — bergantung pada #1,
-   jadi ikut tertunda. Homepage sekarang cuma mode "latest posts".
+1. ~~**Content type "page" — CRUD admin/API belum ada**~~ — **SELESAI**
+   (lihat "Pekerjaan pasca-roadmap #3: Page CRUD" di bawah).
+2. **`settings.homepageContentId` (static front page)** — MASIH ditunda
+   (independen dari #1 sekarang, karena "page" sudah punya CRUD lengkap, ini
+   cuma soal homepage BELUM baca setting itu). Homepage saat ini tetap mode
+   "latest posts" saja. Implementasi: di `themes/default/app/pages/index.vue`,
+   kalau `settingsService.get('homepageContentId')` terisi, fetch page itu
+   via `/api/pages/[slug atau id]` dan render kontennya alih-alih list post.
 3. ~~**Roles & Capabilities admin UI**~~ — **SELESAI** (lihat "Ringkasan:
    Users & Roles admin UI" di bawah). Sisa yang masih belum ada: bikin role
    CUSTOM lewat UI (di luar 4 `SYSTEM_ROLES` bawaan) — lihat #6.
@@ -618,10 +618,15 @@ dipertimbangkan dan didokumentasikan di titik ia di-skip:
    4) — service layer (`assertCan`, `transitionStatus`, dst.) throw `Error`
    polos yang jadi HTTP 500 generik lewat h3, bukan 400/403 yang lebih tepat.
    Fungsional benar (pesan error tetap sampai ke user), cuma kurang REST-precise.
-5. **`delete_pages`/`publish_pages` capability terpisah** — tipe "page" saat
-   ini berbagi satu capability `edit_pages` untuk edit/publish/delete
-   sekaligus (lihat `ContentTypeRegistry` di Phase 2), beda dari "post" yang
-   granular. Cukup untuk sekarang karena UI/API "page" sendiri belum ada (#1).
+5. **`delete_pages`/`publish_pages` capability terpisah** — tipe "page"
+   SEKARANG SUDAH ada CRUD penuh (#1 selesai), tapi masih sengaja berbagi
+   SATU capability `edit_pages` untuk edit/publish/delete sekaligus (lihat
+   `ContentTypeRegistry` di Phase 2), beda dari "post" yang granular
+   (`edit_posts`/`publish_posts`/`delete_posts` terpisah). Ini keputusan yang
+   masih berlaku, bukan lagi soal "API-nya belum ada" — kalau nanti mau
+   granular, tinggal: tambah 2 capability baru ke `CAPABILITIES` const +
+   `SYSTEM_ROLES`, update `ContentTypeRegistry.get("page").capabilityMap`,
+   generate+jalankan migration seed baru.
 6. **Role CUSTOM lewat UI** — `RoleService`/`/roles` sekarang cuma VIEW
    read-only untuk 4 `SYSTEM_ROLES` bawaan (+ capability tambahan dari
    plugin). Assign multi-role ke user SUDAH bisa lewat `/users/[id]`
@@ -688,6 +693,64 @@ benar-benar bikin/update/publish/trash/restore-revision/delete content lewat
 Postgres asli dan menolak transisi ilegal (`trashed→published`). DB
 terverifikasi bersih setelah test selesai (`select count(*) from content
 where slug like 'vitest-fixture%'` → 0).
+
+## Pekerjaan pasca-roadmap #3: CRUD content type "page" (selesai)
+
+Meniru persis pola `posts/*` yang sudah ada sejak Phase 2/4/5 (bukan
+refactor jadi generic — lihat alasan di bawah), MINUS categories/tags
+(`ContentTypeDefinition` untuk "page" tidak punya taxonomy), PLUS
+`parentId`/`menuOrder` untuk hierarki.
+
+- `ContentService.CreateContentInput`/`UpdateContentInput` dapat field
+  `parentId`/`menuOrder` baru (opsional) — `update()` sudah spread `input`
+  langsung ke `.set()` jadi otomatis kepakai tanpa perlu ubah method itu
+  sendiri.
+- Admin API: `/api/pages` (index + `[id]`) + seluruh action endpoint
+  (`publish/unpublish/submit/schedule/trash/untrash`) + `revisions/*` +
+  `seo.{get,put}` — 15 file, SEMUA pakai capability `edit_pages` tunggal
+  (bukan `publish_pages`/`delete_pages` terpisah, lihat item #5 di atas).
+- Admin UI: `/pages` (list), `/pages/new`, `/pages/[id]` (SAMA seperti
+  posts/[id].vue: BlockEditor, featured image, SEO panel, Revisions panel,
+  action bar kondisional per status — TAPI ganti section Categories/Tags
+  dengan section "Hierarki" berisi `<select>` parent page + input
+  `menuOrder`; TIDAK ada integrasi `AdminUIRegistry`/plugin editor panel
+  karena `example-plugin` cuma register panel untuk content type "post").
+- Frontend: `server/api/pages/[slug].get.ts` (read-only, published only,
+  resolve `seo`+`jsonLd` — pola identik `posts/[slug].get.ts`),
+  `themes/default/app/pages/[slug].vue` (halaman publik single-segment).
+  `sitemap.xml.ts` diupdate query pages juga (`SeoService.sitemapEntries()`
+  SUDAH otomatis handle path pages sebagai `/${slug}` vs `/blog/${slug}`
+  untuk post — tidak perlu ubah `SeoService` sama sekali).
+
+**Penyederhanaan yang disengaja** (beda dari uraian asli di plan): URL page
+publik `/[slug]` cuma SATU segmen (mis. `/about`), BUKAN
+`pages/[...slug].vue` catch-all hierarkis yang disebut plan (mis.
+`/about/team` merefleksikan `parentId` chain). `parentId`/`menuOrder`
+tetap berfungsi penuh untuk ORGANISASI di admin (bisa dipakai nanti untuk
+navigasi/menu bertingkat), tapi TIDAK memengaruhi struktur URL — 2 page
+dengan parent berbeda tapi slug sama (mis. keduanya "team") akan BENTROK di
+`/team`. Alasan skip: resolve URL hierarkis penuh butuh logic tambahan
+signifikan (jalan-jalan parentId chain match tiap segmen path) untuk value
+yang marginal di v1. Juga: page dengan slug yang sama seperti route statis
+frontend yang sudah ada (`/blog`, dst.) akan ke-shadow oleh route statis itu
+(Vue Router memprioritaskan static route di atas dynamic `[slug]`) — sama
+seperti WordPress punya reserved-slug behavior serupa, tidak di-guard
+eksplisit.
+
+**Terverifikasi via curl, termasuk SSR (bukan cuma endpoint JSON — lihat
+Gotcha #17 soal kenapa ini wajib)**: buat parent page + child page dengan
+`parentId`/`menuOrder` → update (revisi tersimpan) → set SEO custom →
+publish keduanya → akses publik `/api/pages/[slug]` (SEO ter-resolve
+benar) → **SSR `/pages/[id]` (editor), `/pages` (list), `/pages/new` semua
+200 dengan konten benar** → SSR publik `/[slug]` render benar → `/sitemap.xml`
+memuat kedua page path → transisi ilegal (`trashed→published`) ditolak. DB
+bersih setelah cleanup. Lint+typecheck bersih di semua package/app,
+`pnpm test` tetap 29/29 (tidak ada regresi dari penambahan
+`parentId`/`menuOrder` ke `ContentService`).
+
+Dengan ini, SEMUA item "sengaja ditunda" nomor #1 dan #3 sudah selesai;
+`settings.homepageContentId` (#2) masih ditunda tapi sekarang independen
+(lihat catatan di atas).
 
 ## Git
 

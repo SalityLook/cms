@@ -32,6 +32,7 @@ async function onLogout() {
 
       <UCard class="flex flex-wrap gap-4">
         <NuxtLink to="/posts" class="text-primary hover:underline">Posts →</NuxtLink>
+        <NuxtLink to="/pages" class="text-primary hover:underline">Pages →</NuxtLink>
         <NuxtLink to="/media" class="text-primary hover:underline">Media →</NuxtLink>
         <NuxtLink to="/categories" class="text-primary hover:underline">Categories →</NuxtLink>
         <NuxtLink to="/tags" class="text-primary hover:underline">Tags →</NuxtLink>

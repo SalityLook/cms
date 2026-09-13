@@ -104,6 +104,9 @@ export interface PostDetail {
   terms: TermSummary[];
 }
 
+export type PageSummary = PostSummary;
+export type PageDetail = Omit<PostDetail, "terms">;
+
 export interface MediaItem {
   id: string;
   url: string;
