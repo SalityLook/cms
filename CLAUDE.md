@@ -35,9 +35,9 @@ tanpa perlu re-derive keputusan yang sudah diambil.
 - ✅ **Phase 2 — Content CRUD + block editor**
 - ✅ **Phase 3 — Taxonomies + media**
 - ✅ **Phase 4 — Revisions + full publishing workflow**
-- ✅ **Phase 5 — SEO subsystem** (lihat bagian di bawah)
-- ⬜ Phase 6 — Frontend polish + theme layer (**berikutnya**)
-- ⬜ Phase 7 — Hook/plugin system + example plugin
+- ✅ **Phase 5 — SEO subsystem**
+- ✅ **Phase 6 — Frontend polish + theme layer** (lihat bagian di bawah)
+- ⬜ Phase 7 — Hook/plugin system + example plugin (**berikutnya, fase terakhir**)
 
 Detail lengkap tiap fase (deliverable, file yang harus dibuat) ada di bagian
 "Phased Build Roadmap" pada plan file yang disebut di atas. Jangan ulangi riset
@@ -90,13 +90,16 @@ selftaught/
 │   │   ├── server/api/posts/[id]/seo.{get,put}.ts, server/api/settings/index.{get,patch}.ts
 │   │   ├── app/pages/settings.vue
 │   │   └── server/routes/media/[...path].get.ts   # serves uploaded files from MEDIA_LOCAL_PATH
-│   └── frontend/                # Nuxt 4, port 3001 — public site, extends themes/default
-│       ├── app/pages/index.vue, blog/{index,[slug]}.vue, category/[slug].vue, tag/[slug].vue
-│       ├── server/api/posts/{index,[slug]}.get.ts       # read-only, hanya status=published; [slug] includes resolved `seo`+`jsonLd`
+│   └── frontend/                # Nuxt 4, port 3001 — TIPIS: cuma server/ + config, extends themes/default
+│       ├── nuxt.config.ts       # extends + routeRules (SWR 60s di /blog,/category,/tag) + runtimeConfig
+│       ├── server/api/posts/{index,[slug]}.get.ts       # index.get.ts: paginated {posts,page,totalPages}; [slug] includes resolved `seo`+`jsonLd`
 │       ├── server/api/{category,tag}/[slug].get.ts      # archive listing
-│       ├── server/routes/sitemap.xml.ts, robots.txt.ts  # (public/robots.txt statis SUDAH DIHAPUS, lihat catatan Phase 5)
+│       ├── server/routes/sitemap.xml.ts, robots.txt.ts  # (public/robots.txt statis SUDAH DIHAPUS, lihat Gotcha soal ini)
 │       └── server/routes/media/[...path].get.ts         # SAME route as admin, same shared disk folder
-├── themes/default/              # Nuxt Layer kosong (reference theme, diisi Phase 6)
+├── themes/default/              # @selftaught/theme-default — pnpm workspace package SUNGGUHAN (lihat Gotcha #15)
+│   ├── package.json             # declare @selftaught/core+blocks (deps) & @nuxt/kit+tailwindcss/vite+nuxt+vue (devDeps)
+│   ├── nuxt.config.ts           # css + tailwindcss vite plugin, pakai createResolver() bukan `~/...` (Gotcha #14)
+│   └── app/{app.vue,error.vue,pages/{index,blog/{index,[slug]},category/[slug],tag/[slug]}.vue,assets/css/main.css}
 └── plugins/                     # kosong (Phase 7)
 ```
 
@@ -260,6 +263,34 @@ pnpm --filter @selftaught/core db:seed
     pertama, sekarang sudah dibuang) TIDAK cukup — harus `as any` yang benar-benar
     skip type matching-nya.
 
+14. **Nuxt Layers: string relatif `~/...` di dalam `css: [...]` sebuah layer
+    resolve ke srcDir APP YANG MENG-EXTEND, bukan ke layer itu sendiri** —
+    counter-intuitive. Kalau layer (`themes/default/nuxt.config.ts`) mau
+    reference file miliknya sendiri (CSS, dll), WAJIB pakai
+    `createResolver(import.meta.url).resolve("./app/...")` dari `@nuxt/kit`,
+    bukan string `~/...` biasa. Lihat `themes/default/nuxt.config.ts`.
+
+15. **Nuxt Layer yang isinya import package workspace (`@selftaught/core`,
+    dll) HARUS jadi pnpm workspace package sungguhan** (punya `package.json`
+    sendiri yang declare dependency-nya), meskipun secara runtime
+    Vite/Nitro bisa resolve tanpa itu (karena bundler resolve relatif ke
+    rootDir app yang meng-extend). `vue-tsc`/`nuxt typecheck` resolve modul
+    dari LOKASI FISIK FILE di disk, jadi kalau `themes/default/app/pages/*.vue`
+    import `@selftaught/core` tapi `themes/default` tidak punya
+    `node_modules` sendiri (bukan workspace member), typecheck gagal
+    "Cannot find module" walau `nuxt dev` jalan normal. Sudah di-fix:
+    `themes/default/package.json` (nama `@selftaught/theme-default`) declare
+    `@selftaught/core`/`@selftaught/blocks` sebagai dependency dan
+    `@nuxt/kit`/`@tailwindcss/vite`/`nuxt`/`vue` sebagai devDependency. Kalau
+    bikin theme baru yang import package workspace, ulangi pola ini.
+
+16. **`throw createError({statusCode:404,...})` di dalam halaman Nuxt SSR
+    kadang balas JSON mentah alih-alih halaman `error.vue` kalau di-test
+    pakai `curl` polos** (curl default `Accept: */*` tidak dianggap
+    "browser request" oleh Nitro). **Bukan bug** — browser sungguhan selalu
+    kirim `Accept: text/html,...` dan akan dapat halaman error.vue yang
+    benar. Untuk test manual via curl, tambahkan `-H "Accept: text/html"`.
+
 ## Kredensial dev (lokal, dari seed)
 
 - Admin login: **admin@example.com** / **changeme123!**
@@ -396,32 +427,79 @@ hilang dari `/sitemap.xml`; toggle `discourageSearchEngines` mengubah
 sedikit, tapi tetap waspada kalau Phase 6/7 menambah banyak route dinamis
 di frontend juga).
 
-## Cara lanjut ke Phase 6 (Frontend polish + theme layer)
+## Ringkasan Phase 6 (selesai)
 
-Baca bagian "Phase 6" di plan file
+`apps/frontend/app/` (pages/app.vue/assets) dipindah SELURUHNYA ke
+`themes/default/app/` — `apps/frontend` sekarang cuma berisi `nuxt.config.ts`
+(extends + routeRules + runtimeConfig) dan `server/` (API routes + media
+serving), tidak ada `app/` lokal sama sekali; semua tampilan diwarisi dari
+layer. `themes/default` jadi pnpm workspace package sungguhan (lihat Gotcha
+#15) supaya `nuxt typecheck` bisa resolve `@selftaught/core`/`@selftaught/blocks`
+dari lokasi fisik file di dalam theme. CSS+Tailwind Vite plugin dipindah ke
+`themes/default/nuxt.config.ts` sendiri pakai `createResolver()` (Gotcha #14),
+supaya theme benar-benar self-contained (ganti path `extends` di
+`apps/frontend/nuxt.config.ts` = ganti seluruh tampilan tanpa sentuh apps/frontend
+sama sekali). Tambahan: `ContentService.list()`/`count()` sekarang dukung
+`limit`/`offset` untuk pagination; `/blog` dan homepage (`/`) pakai itu lewat
+`GET /api/posts?page=N&limit=M` (response `{posts,page,totalPages}` —
+**BREAKING CHANGE** dari Phase 2-5 yang responnya array polos, tapi cuma
+dikonsumsi `blog/index.vue`+homepage, sudah diupdate bareng); `themes/default/app/error.vue`
+custom error page; `routeRules` SWR 60s di `/blog/**`,`/category/**`,`/tag/**`.
+
+**Terverifikasi**: `nuxt dev` frontend boot normal dari layer (bukan lagi dari
+`apps/frontend/app/` yang sudah tidak ada), homepage tampilkan 5 post terbaru,
+pagination `?page=1&2` mengembalikan halaman berbeda dengan benar, halaman
+404 custom render dengan benar (browser asli — lihat Gotcha #16 soal test
+`curl`). Lint+typecheck bersih di semua package/app.
+
+**Sengaja DITUNDA (bukan lupa)**: CRUD content type "page" (list/create/edit
+admin + API) — masih cuma terdaftar di `ContentTypeRegistry` sejak Phase 2,
+belum ada UI/API-nya sama sekali. Konsekuensinya: `settings.homepageContentId`
+(static front page ala WordPress) TIDAK diimplementasikan — homepage cuma
+mode "latest posts". Alasan skip: Phase 7 (hook/plugin system) adalah fase
+TERAKHIR di roadmap dan lebih penting untuk membuktikan tujuan inti CMS ini
+("dirancang mendukung theme dan plugin"); membangun Page CRUD penuh (≈15 file
+API+UI meniru persis pola posts) akan menghabiskan budget yang mestinya untuk
+fase terakhir. Page CRUD gampang ditambah kapan saja nanti — ikuti pola
+`apps/admin/server/api/posts/*` dan `apps/admin/app/pages/posts/*` persis,
+tanpa bagian categories/tags (tipe "page" tidak punya taxonomy), tambah
+picker `parentId` (dropdown page lain) dan input `menuOrder` untuk hierarki.
+
+## Cara lanjut ke Phase 7 (Hook/plugin system + example plugin — FASE TERAKHIR)
+
+Baca bagian "Phase 7" di plan file
 (`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`). Ringkas:
 
-1. Extract tampilan frontend saat ini (yang sekarang campur di
-   `apps/frontend/app/`) ke `themes/default/app/` (pages/components/assets)
-   sebagai Nuxt Layer sungguhan — `themes/default/nuxt.config.ts` sudah ada
-   (kosong), `apps/frontend/nuxt.config.ts` sudah `extends: ['../../themes/default']`
-   sejak Phase 0, tapi isinya (pages/blog, category, tag, dll) masih langsung
-   di `apps/frontend/app/` bukan di theme. Pindahkan supaya frontend app jadi
-   benar-benar tipis (cuma server/ + runtime config), dan tema jadi swappable.
-2. Homepage logic: `settings.homepageContentId` (static front page) vs latest
-   posts list — butuh content type "page" yang API/UI-nya belum dibangun sama
-   sekali sampai sekarang (baru terdaftar di `ContentTypeRegistry`, lihat
-   catatan Phase 2). Ini juga saat yang tepat untuk akhirnya bangun CRUD page
-   di admin (copy pola posts persis, cuma tanpa categories/tags karena
-   `ContentTypeDefinition` untuk "page" tidak punya taxonomy)
-3. Pagination di `/blog`, error pages custom, `routeRules` SWR caching
-4. `packages/tailwind-config` sudah ada tapi baru dipakai untuk token warna
-   dasar — pastikan theme punya kesempatan override token-nya
+1. `packages/core/src/hooks/hook-bus.ts` — `HookBus` class: `onAction`/`emitAction`/
+   `onFilter`/`applyFilter`, tipe-aman lewat `ActionMap` interface yang bisa
+   di-augment via declaration merging (plugin nambah hook baru tanpa ubah core).
+   Emit hook nyata dari titik yang masuk akal: `content:beforeSave`/`content:published`
+   di `ContentService`, `user:registered` di `UserService`, dst.
+2. `plugins.config.ts` di root (daftar plugin aktif) + `definePlugin({ id, setup(ctx) {...} })`
+   helper di core — `ctx.hooks`, `ctx.contentTypes.register()` (pakai
+   `contentTypeRegistry` yang sudah ada), `ctx.blocks.register()` (pakai
+   `blockRegistry` dari `@selftaught/blocks` yang sudah ada), `ctx.capabilities.register()`
+   (pakai `CapabilityRegistry` — CATATAN: capability registry SAAT INI di
+   `packages/core/src/registry/capabilities.ts` masih berbentuk const array
+   `CAPABILITIES`, BUKAN kelas registry seperti `contentTypeRegistry`/
+   `taxonomyRegistry` — perlu direfactor jadi class dengan method `register()`
+   dulu supaya plugin bisa nambah capability baru secara dinamis).
+3. `AdminUIRegistry` di `apps/admin` (BUKAN di core — ini UI-specific):
+   `registerMenuItem({label,icon,to,capability})`, `registerEditorPanel(contentType,component)`.
+4. `server/plugins/00.load-plugins.ts` di `apps/admin` DAN `apps/frontend`
+   (Nitro plugin, load saat boot, baca `plugins.config.ts`, panggil `setup()`
+   tiap plugin terdaftar).
+5. `plugins/example-plugin/` — bukti semua extension point jalan: register 1
+   capability baru, hook `content:published` (misal log ke console), 1 panel
+   editor sidebar yang nulis ke `content_meta` (tabel ini sudah ada sejak
+   Phase 2, belum pernah dipakai — inilah use case pertamanya).
 
-Ikuti pola yang SUDAH ada. **WAJIB** pakai `apiFetch`/`useApiFetch` dari
-`apps/admin/app/utils/api.ts` untuk endpoint admin baru (Gotcha #13); kalau
-frontend mulai kena masalah yang sama (banyak route dinamis baru), bikin
-utility yang sama persis di `apps/frontend/app/utils/api.ts`.
+Ini FASE TERAKHIR di roadmap. Setelah ini selesai + di-commit, CMS sudah
+mengimplementasikan semua 8 fase yang direncanakan (Phase 0-7). Item yang
+sengaja ditunda di sepanjang jalan (page CRUD, delete_pages/publish_pages
+capability terpisah, custom error classes buat HTTP status code yang lebih
+presisi — lihat catatan Phase 4) boleh jadi pekerjaan lanjutan di luar
+roadmap awal, dicatat di sini supaya tidak hilang.
 
 ## Git
 

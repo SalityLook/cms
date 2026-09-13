@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, count as countRows, desc, eq, lte } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { content } from "../../db/schema/content";
 import type { RevisionService } from "../../domain/revisions/revision-service";
@@ -29,6 +29,8 @@ export interface UpdateContentInput {
 export interface ListContentFilters {
   type?: string;
   status?: ContentStatus;
+  limit?: number;
+  offset?: number;
 }
 
 /**
@@ -227,8 +229,22 @@ export class ContentService {
 
     return this.db.query.content.findMany({
       where: conditions.length ? and(...conditions) : undefined,
-      orderBy: [desc(content.updatedAt)]
+      orderBy: [desc(content.updatedAt)],
+      limit: filters.limit,
+      offset: filters.offset
     });
+  }
+
+  async count(filters: Pick<ListContentFilters, "type" | "status"> = {}): Promise<number> {
+    const conditions = [];
+    if (filters.type) conditions.push(eq(content.type, filters.type));
+    if (filters.status) conditions.push(eq(content.status, filters.status));
+
+    const [row] = await this.db
+      .select({ value: countRows() })
+      .from(content)
+      .where(conditions.length ? and(...conditions) : undefined);
+    return row?.value ?? 0;
   }
 
   private snapshotCurrent(actor: Actor, existing: ContentRow) {
