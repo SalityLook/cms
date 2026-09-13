@@ -10,6 +10,9 @@
     "postinstall": "nuxt prepare",
     "typecheck": "nuxt typecheck"
   },
+  "devDependencies": {
+    "@nuxt/eslint": "^0.7.4"
+  },
   "dependencies": {
     "@selftaught/blocks": "workspace:*",
     "@selftaught/core": "workspace:*",

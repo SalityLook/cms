@@ -1,14 +1,15 @@
-import nuxt from "@nuxt/eslint-config/flat";
+import tseslint from "typescript-eslint";
 
-export default [
-  ...nuxt(),
+export default tseslint.config(
   {
     ignores: [
       "**/dist/**",
       "**/.nuxt/**",
       "**/.output/**",
       "**/node_modules/**",
-      "**/drizzle/**"
+      "**/drizzle/**",
+      "apps/**"
     ]
-  }
-];
+  },
+  tseslint.configs.recommended
+);
