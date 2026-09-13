@@ -16,6 +16,7 @@ const { data: mediaItems } = await useApiFetch<MediaItem[]>("/api/media");
 const { data: categories } = await useApiFetch<TermSummary[]>("/api/taxonomy/category");
 const { data: tags } = await useApiFetch<TermSummary[]>("/api/taxonomy/tag");
 const { data: revisions, refresh: refreshRevisions } = await useApiFetch<RevisionSummary[]>(`/api/posts/${id}/revisions`);
+const { data: seo } = await useApiFetch<ContentSeo | null>(`/api/posts/${id}/seo`);
 
 const title = ref(post.value.title);
 const slug = ref(post.value.slug);
@@ -27,6 +28,12 @@ const saving = ref(false);
 const error = ref("");
 const showScheduleInput = ref(false);
 const scheduledAt = ref("");
+
+const seoTitle = ref(seo.value?.title ?? "");
+const seoDescription = ref(seo.value?.description ?? "");
+const seoOgImageId = ref<string | null>(seo.value?.ogImageMediaId ?? null);
+const seoCanonicalUrl = ref(seo.value?.canonicalUrl ?? "");
+const seoNoindex = ref(seo.value?.noindex ?? false);
 
 function toggleTerm(termId: string) {
   const idx = selectedTermIds.value.indexOf(termId);
@@ -50,17 +57,29 @@ async function withErrorHandling(action: () => Promise<unknown>) {
 async function onSave() {
   saving.value = true;
   await withErrorHandling(() =>
-    apiFetch(`/api/posts/${id}`, {
-      method: "PATCH",
-      body: {
-        title: title.value,
-        slug: slug.value,
-        excerpt: excerpt.value || undefined,
-        content: doc.value,
-        featuredMediaId: featuredMediaId.value,
-        termIds: selectedTermIds.value
-      }
-    })
+    Promise.all([
+      apiFetch(`/api/posts/${id}`, {
+        method: "PATCH",
+        body: {
+          title: title.value,
+          slug: slug.value,
+          excerpt: excerpt.value || undefined,
+          content: doc.value,
+          featuredMediaId: featuredMediaId.value,
+          termIds: selectedTermIds.value
+        }
+      }),
+      apiFetch(`/api/posts/${id}/seo`, {
+        method: "PUT",
+        body: {
+          title: seoTitle.value || null,
+          description: seoDescription.value || null,
+          ogImageMediaId: seoOgImageId.value,
+          canonicalUrl: seoCanonicalUrl.value || null,
+          noindex: seoNoindex.value
+        }
+      })
+    ])
   );
   saving.value = false;
 }
@@ -208,6 +227,40 @@ async function onDelete() {
           <p v-if="!tags?.length" class="text-gray-400 text-sm">
             Belum ada tag. Buat di halaman <NuxtLink to="/tags" class="underline">Tags</NuxtLink>.
           </p>
+        </div>
+      </UCard>
+
+      <UCard>
+        <h2 class="font-medium mb-3">SEO</h2>
+        <div class="space-y-4">
+          <UFormField label="SEO Title (opsional, fallback ke Judul)">
+            <UInput v-model="seoTitle" class="w-full" />
+          </UFormField>
+          <UFormField label="Meta Description (opsional, fallback ke Ringkasan)">
+            <UTextarea v-model="seoDescription" class="w-full" :rows="2" />
+          </UFormField>
+          <UFormField label="Canonical URL (opsional)">
+            <UInput v-model="seoCanonicalUrl" class="w-full" placeholder="https://..." />
+          </UFormField>
+          <div>
+            <p class="text-sm font-medium mb-2">OG Image (opsional, fallback ke Gambar Unggulan)</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="item in mediaItems"
+                :key="item.id"
+                type="button"
+                class="border-2 rounded-md overflow-hidden"
+                :class="seoOgImageId === item.id ? 'border-primary' : 'border-transparent'"
+                @click="seoOgImageId = seoOgImageId === item.id ? null : item.id"
+              >
+                <img :src="item.url" :alt="item.altText ?? ''" class="w-12 h-12 object-cover">
+              </button>
+            </div>
+          </div>
+          <label class="flex items-center gap-2 text-sm">
+            <input v-model="seoNoindex" type="checkbox">
+            Noindex (sembunyikan dari mesin pencari)
+          </label>
         </div>
       </UCard>
 

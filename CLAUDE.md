@@ -34,9 +34,9 @@ tanpa perlu re-derive keputusan yang sudah diambil.
 - ✅ **Phase 1 — Core schema + auth + RBAC** (commit `86e992e`)
 - ✅ **Phase 2 — Content CRUD + block editor**
 - ✅ **Phase 3 — Taxonomies + media**
-- ✅ **Phase 4 — Revisions + full publishing workflow** (lihat bagian di bawah)
-- ⬜ Phase 5 — SEO subsystem (**berikutnya**)
-- ⬜ Phase 6 — Frontend polish + theme layer
+- ✅ **Phase 4 — Revisions + full publishing workflow**
+- ✅ **Phase 5 — SEO subsystem** (lihat bagian di bawah)
+- ⬜ Phase 6 — Frontend polish + theme layer (**berikutnya**)
 - ⬜ Phase 7 — Hook/plugin system + example plugin
 
 Detail lengkap tiap fase (deliverable, file yang harus dibuat) ada di bagian
@@ -87,11 +87,14 @@ selftaught/
 │   │   ├── server/api/posts/[id]/{submit,schedule,trash,untrash}.post.ts
 │   │   ├── server/api/posts/[id]/revisions/index.get.ts + [revisionId]/restore.post.ts
 │   │   ├── server/tasks/content/publish-scheduled.ts  # Nitro cron, "* * * * *"
+│   │   ├── server/api/posts/[id]/seo.{get,put}.ts, server/api/settings/index.{get,patch}.ts
+│   │   ├── app/pages/settings.vue
 │   │   └── server/routes/media/[...path].get.ts   # serves uploaded files from MEDIA_LOCAL_PATH
 │   └── frontend/                # Nuxt 4, port 3001 — public site, extends themes/default
 │       ├── app/pages/index.vue, blog/{index,[slug]}.vue, category/[slug].vue, tag/[slug].vue
-│       ├── server/api/posts/{index,[slug]}.get.ts       # read-only, hanya status=published
+│       ├── server/api/posts/{index,[slug]}.get.ts       # read-only, hanya status=published; [slug] includes resolved `seo`+`jsonLd`
 │       ├── server/api/{category,tag}/[slug].get.ts      # archive listing
+│       ├── server/routes/sitemap.xml.ts, robots.txt.ts  # (public/robots.txt statis SUDAH DIHAPUS, lihat catatan Phase 5)
 │       └── server/routes/media/[...path].get.ts         # SAME route as admin, same shared disk folder
 ├── themes/default/              # Nuxt Layer kosong (reference theme, diisi Phase 6)
 └── plugins/                     # kosong (Phase 7)
@@ -365,31 +368,60 @@ Perbaikan idealnya: custom error classes (`CapabilityError`, `TransitionError`)
 karena `requireCapability` di API layer sudah menangkap kasus paling umum
 (401/403 yang benar); ini cuma soal defense-in-depth di service layer.
 
-## Cara lanjut ke Phase 5 (SEO subsystem)
+## Ringkasan Phase 5 (selesai)
 
-Baca bagian "Phase 5" di plan file
+`content_seo` (1:1 ke `content`) + `settings` (key/value jsonb) tables
+(migration `0004_productive_the_order.sql`). `SettingsService` (get/set/getAll,
+generic key-value, dipakai untuk `siteName`/`siteDescription`/
+`defaultOgImageMediaId`/`discourageSearchEngines`). `SeoService.resolve(content)`
+— title/description fallback content→settings, OG image fallback SEO row→
+site default (featuredMediaUrl di-fallback lagi di level API route kalau
+`ogImageUrl` masih kosong); `generateJsonLd()` (BlogPosting/WebPage + merge
+`structuredDataOverride`); `sitemapEntries()` (skip yang `noindex`). Admin:
+panel SEO di `posts/[id].vue` (title/description/canonical/OG-image-picker/
+noindex, tersimpan bareng tombol Simpan utama lewat `Promise.all`), halaman
+baru `/settings` (General + default OG image + toggle "cegah indexing").
+Frontend: `useSeoMeta`+`useHead` (title/description/OG/canonical/JSON-LD
+`<script>`) di `blog/[slug].vue` pakai field `seo`/`jsonLd` yang sudah
+di-resolve oleh `server/api/posts/[slug].get.ts`; `server/routes/sitemap.xml.ts`
+dan `robots.txt.ts` (hapus dulu `public/robots.txt` statis bawaan `nuxi init`
+yang bentrok path-nya dengan server route dinamis).
+
+**Terverifikasi end-to-end via curl**: custom SEO override tampil benar di
+`<title>`/meta description/canonical/JSON-LD halaman publik; post TANPA SEO
+custom fallback ke title/excerpt dengan benar; `noindex=true` membuat post
+hilang dari `/sitemap.xml`; toggle `discourageSearchEngines` mengubah
+`/robots.txt` jadi `Disallow: /`. Lint+typecheck bersih di semua package/app
+(frontend belum butuh fix `apiFetch`/Gotcha #13 — jumlah route-nya masih
+sedikit, tapi tetap waspada kalau Phase 6/7 menambah banyak route dinamis
+di frontend juga).
+
+## Cara lanjut ke Phase 6 (Frontend polish + theme layer)
+
+Baca bagian "Phase 6" di plan file
 (`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`). Ringkas:
 
-1. `packages/core/src/db/schema/seo.ts` — tabel `content_seo` (contentId 1:1 PK/FK
-   ke `content.id`, title, description, ogImageMediaId, canonicalUrl, noindex,
-   structuredDataOverride jsonb) + tabel `settings` (key pk, value jsonb) untuk
-   default SEO site-wide (site title, default OG image, dll)
-2. `SeoService` — `resolve(content)` (fallback ke title/excerpt content lalu ke
-   `settings` kalau field SEO kosong), `generateJsonLd(content)` (Article/
-   BlogPosting untuk post, WebPage untuk page, merge dengan
-   `structuredDataOverride` kalau admin isi manual)
-3. Admin: panel SEO di sidebar editor post (title/description/OG
-   image-picker pakai pola yang sama seperti featured-image picker/canonical/
-   noindex toggle), halaman Settings (General + SEO defaults)
-4. Frontend: `useSeoMeta()`/`useHead()` di `blog/[slug].vue` (dan halaman
-   lain) pakai hasil `SeoService.resolve()`, `server/routes/sitemap.xml.ts`
-   (query semua published content + taxonomy archive, hormati `noindex`),
-   `server/routes/robots.txt.ts` (toggle via `settings`)
+1. Extract tampilan frontend saat ini (yang sekarang campur di
+   `apps/frontend/app/`) ke `themes/default/app/` (pages/components/assets)
+   sebagai Nuxt Layer sungguhan — `themes/default/nuxt.config.ts` sudah ada
+   (kosong), `apps/frontend/nuxt.config.ts` sudah `extends: ['../../themes/default']`
+   sejak Phase 0, tapi isinya (pages/blog, category, tag, dll) masih langsung
+   di `apps/frontend/app/` bukan di theme. Pindahkan supaya frontend app jadi
+   benar-benar tipis (cuma server/ + runtime config), dan tema jadi swappable.
+2. Homepage logic: `settings.homepageContentId` (static front page) vs latest
+   posts list — butuh content type "page" yang API/UI-nya belum dibangun sama
+   sekali sampai sekarang (baru terdaftar di `ContentTypeRegistry`, lihat
+   catatan Phase 2). Ini juga saat yang tepat untuk akhirnya bangun CRUD page
+   di admin (copy pola posts persis, cuma tanpa categories/tags karena
+   `ContentTypeDefinition` untuk "page" tidak punya taxonomy)
+3. Pagination di `/blog`, error pages custom, `routeRules` SWR caching
+4. `packages/tailwind-config` sudah ada tapi baru dipakai untuk token warna
+   dasar — pastikan theme punya kesempatan override token-nya
 
-Ikuti pola yang SUDAH ada: service menerima `Database` di constructor, singleton
-di `packages/core/src/server.ts`, zod schema di `packages/core/src/shared/`.
-**WAJIB** pakai `apiFetch`/`useApiFetch` dari `apps/admin/app/utils/api.ts`
-untuk endpoint baru (lihat Gotcha #13) — jangan `$fetch`/`useFetch` langsung.
+Ikuti pola yang SUDAH ada. **WAJIB** pakai `apiFetch`/`useApiFetch` dari
+`apps/admin/app/utils/api.ts` untuk endpoint admin baru (Gotcha #13); kalau
+frontend mulai kena masalah yang sama (banyak route dinamis baru), bikin
+utility yang sama persis di `apps/frontend/app/utils/api.ts`.
 
 ## Git
 

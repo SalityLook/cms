@@ -35,6 +35,7 @@ async function onLogout() {
         <NuxtLink to="/media" class="text-primary hover:underline">Media →</NuxtLink>
         <NuxtLink to="/categories" class="text-primary hover:underline">Categories →</NuxtLink>
         <NuxtLink to="/tags" class="text-primary hover:underline">Tags →</NuxtLink>
+        <NuxtLink to="/settings" class="text-primary hover:underline">Settings →</NuxtLink>
       </UCard>
     </main>
   </div>

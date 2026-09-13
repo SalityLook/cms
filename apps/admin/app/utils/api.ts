@@ -71,3 +71,16 @@ export interface RevisionSummary {
   title: string;
   createdAt: string;
 }
+
+export interface ContentSeo {
+  contentId: string;
+  title: string | null;
+  description: string | null;
+  ogImageMediaId: string | null;
+  canonicalUrl: string | null;
+  noindex: boolean;
+  structuredDataOverride: Record<string, unknown> | null;
+  updatedAt: string;
+}
+
+export type SettingsMap = Record<string, unknown>;

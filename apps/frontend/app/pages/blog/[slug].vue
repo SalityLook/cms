@@ -16,8 +16,22 @@ const categories = computed(() => post.value?.terms.filter((term) => term.taxono
 const tags = computed(() => post.value?.terms.filter((term) => term.taxonomy === "tag") ?? []);
 
 useSeoMeta({
-  title: post.value.title,
-  description: post.value.excerpt ?? undefined
+  title: post.value.seo.title,
+  description: post.value.seo.description ?? undefined,
+  ogTitle: post.value.seo.title,
+  ogDescription: post.value.seo.description ?? undefined,
+  ogImage: post.value.seo.ogImageUrl ?? undefined,
+  robots: post.value.seo.noindex ? "noindex, nofollow" : undefined
+});
+
+useHead({
+  link: post.value.seo.canonicalUrl ? [{ rel: "canonical", href: post.value.seo.canonicalUrl }] : [],
+  script: [
+    {
+      type: "application/ld+json",
+      innerHTML: JSON.stringify(post.value.jsonLd)
+    }
+  ]
 });
 </script>
 
