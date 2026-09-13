@@ -379,6 +379,7 @@ pnpm db:studio       # drizzle-kit studio (GUI browser DB)
 # Quality gates (jalankan sebelum commit)
 pnpm typecheck       # -r --parallel typecheck di semua package (core: tsc, admin/frontend: nuxt typecheck)
 pnpm lint            # eslint . (root config untuk packages/*, tiap app pakai config sendiri — lihat Gotcha #4)
+pnpm test            # vitest — unit test + integration test ke Postgres dev asli (butuh db:migrate+db:seed dulu)
 ```
 
 ## Ringkasan Phase 2 (selesai)
@@ -653,6 +654,40 @@ Phase 7 ikut ter-hitung di role `admin`) → buat user baru dengan role
 seperti `SYSTEM_ROLES.author` → user itu ditolak (403) akses endpoint
 `manage_users` → admin suspend + lepas semua role user itu → user yang
 di-suspend tidak bisa login lagi (401). Lint+typecheck bersih.
+
+## Pekerjaan pasca-roadmap #2: Automated tests (selesai)
+
+`vitest` sudah terpasang sejak Phase 0 tapi nol test sampai titik ini — semua
+verifikasi sebelumnya manual via curl. Sekarang ada 29 test di 6 file,
+`pnpm test` (= `dotenv -e .env -- vitest run`, config di root
+`vitest.config.ts`, scan `packages/**/*.test.ts` + `plugins/**/*.test.ts`):
+
+- **Unit test murni (tanpa DB)**: `hooks/hook-bus.test.ts`,
+  `registry/capabilities.test.ts`, `registry/content-types.test.ts`,
+  `registry/taxonomies.test.ts`, `domain/users/permission-service.test.ts`
+  (`PermissionService.can()` tidak menyentuh DB — cuma `loadActor()` yang
+  perlu — jadi bisa dites dengan `new PermissionService(null as never, null as never)`
+  plus object `Actor` bikinan sendiri).
+- **Integration test (Postgres ASLI, bukan mock)**:
+  `domain/content/content-service.integration.test.ts` — sengaja pakai
+  database dev yang sama (`DATABASE_URL` dari `.env`), BUKAN database test
+  terpisah, karena effort provisioning+migrate DB kedua tidak sepadan untuk
+  scope saat ini. Amannya: pakai `permissionService.loadActor()` terhadap
+  user admin hasil seed yang SUDAH ADA (bukan bikin user fixture baru —
+  `content.authorId` adalah FK NOT NULL ke `users.id`, jadi actor palsu bikin
+  insert gagal), dan HANYA row `content` (+ `revisions` yang ikut cascade)
+  yang jadi fixture, di-cleanup total di `afterAll`. Prasyarat sebelum
+  `pnpm test`: `pnpm db:migrate && pnpm db:seed` sudah pernah jalan (sama
+  seperti prasyarat dev biasa, bukan setup tambahan).
+- `HookBus` diekspor sebagai class (`export class HookBus`, sebelumnya cuma
+  instance singleton `hooks` yang diekspor) supaya test bisa bikin instance
+  bersih per test tanpa saling mengotori lewat singleton bersama.
+
+**Terverifikasi**: `pnpm test` → 29/29 lolos termasuk integration test yang
+benar-benar bikin/update/publish/trash/restore-revision/delete content lewat
+Postgres asli dan menolak transisi ilegal (`trashed→published`). DB
+terverifikasi bersih setelah test selesai (`select count(*) from content
+where slug like 'vitest-fixture%'` → 0).
 
 ## Git
 

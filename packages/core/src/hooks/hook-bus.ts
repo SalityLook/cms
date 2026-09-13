@@ -19,7 +19,7 @@ export interface ActionMap {
 type ActionHandler<P> = (payload: P) => void | Promise<void>;
 type FilterHandler<T> = (value: T, ctx?: unknown) => T | Promise<T>;
 
-class HookBus {
+export class HookBus {
   private readonly actionHandlers = new Map<string, Set<ActionHandler<never>>>();
   private readonly filterHandlers = new Map<string, FilterHandler<never>[]>();
 
