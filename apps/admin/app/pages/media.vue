@@ -1,7 +1,7 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth" });
 
-const { data: items, refresh } = await useFetch("/api/media");
+const { data: items, refresh } = await useApiFetch<MediaItem[]>("/api/media");
 const uploading = ref(false);
 const error = ref("");
 
@@ -15,7 +15,7 @@ async function onFileChange(event: Event) {
   try {
     const form = new FormData();
     form.append("file", file);
-    await $fetch("/api/media", { method: "POST", body: form });
+    await apiFetch("/api/media", { method: "POST", body: form });
     await refresh();
   } catch (err) {
     error.value = (err as { data?: { statusMessage?: string } })?.data?.statusMessage ?? "Gagal upload.";
@@ -26,7 +26,7 @@ async function onFileChange(event: Event) {
 }
 
 async function onDelete(id: string) {
-  await $fetch(`/api/media/${id}`, { method: "DELETE" });
+  await apiFetch(`/api/media/${id}`, { method: "DELETE" });
   await refresh();
 }
 </script>

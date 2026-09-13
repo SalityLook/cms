@@ -4,6 +4,12 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@nuxt/ui", "nuxt-auth-utils", "@nuxt/eslint"],
   css: ["~/assets/css/main.css"],
+  nitro: {
+    experimental: { tasks: true },
+    scheduledTasks: {
+      "* * * * *": ["content:publish-scheduled"]
+    }
+  },
   runtimeConfig: {
     databaseUrl: process.env.DATABASE_URL,
     session: {

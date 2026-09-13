@@ -3,6 +3,8 @@ definePageMeta({ middleware: "auth" });
 
 const { data: posts } = await useFetch("/api/posts");
 
+const visiblePosts = computed(() => posts.value?.filter((post) => post.status !== "trashed") ?? []);
+
 const statusColor: Record<string, "neutral" | "success" | "warning" | "info" | "error"> = {
   draft: "neutral",
   published: "success",
@@ -20,7 +22,10 @@ const statusColor: Record<string, "neutral" | "success" | "warning" | "info" | "
         <span class="text-gray-400">/</span>
         <span>Posts</span>
       </div>
-      <UButton to="/posts/new" size="sm">Post Baru</UButton>
+      <div class="flex items-center gap-2">
+        <UButton to="/trash" size="sm" variant="ghost">Trash</UButton>
+        <UButton to="/posts/new" size="sm">Post Baru</UButton>
+      </div>
     </header>
 
     <main class="p-6">
@@ -34,7 +39,7 @@ const statusColor: Record<string, "neutral" | "success" | "warning" | "info" | "
             </tr>
           </thead>
           <tbody>
-            <tr v-for="post in posts" :key="post.id" class="border-b border-gray-100 dark:border-gray-900">
+            <tr v-for="post in visiblePosts" :key="post.id" class="border-b border-gray-100 dark:border-gray-900">
               <td class="py-2">
                 <NuxtLink :to="`/posts/${post.id}`" class="text-primary hover:underline">{{ post.title }}</NuxtLink>
               </td>
@@ -43,7 +48,7 @@ const statusColor: Record<string, "neutral" | "success" | "warning" | "info" | "
               </td>
               <td class="py-2 text-gray-500">{{ new Date(post.updatedAt).toLocaleString() }}</td>
             </tr>
-            <tr v-if="!posts?.length">
+            <tr v-if="!visiblePosts.length">
               <td colspan="3" class="py-6 text-center text-gray-400">Belum ada post.</td>
             </tr>
           </tbody>

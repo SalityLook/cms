@@ -33,9 +33,9 @@ tanpa perlu re-derive keputusan yang sudah diambil.
 - ✅ **Phase 0 — Scaffolding** (commit `1954957`)
 - ✅ **Phase 1 — Core schema + auth + RBAC** (commit `86e992e`)
 - ✅ **Phase 2 — Content CRUD + block editor**
-- ✅ **Phase 3 — Taxonomies + media** (lihat bagian di bawah)
-- ⬜ Phase 4 — Revisions + full publishing workflow (**berikutnya**)
-- ⬜ Phase 5 — SEO subsystem
+- ✅ **Phase 3 — Taxonomies + media**
+- ✅ **Phase 4 — Revisions + full publishing workflow** (lihat bagian di bawah)
+- ⬜ Phase 5 — SEO subsystem (**berikutnya**)
 - ⬜ Phase 6 — Frontend polish + theme layer
 - ⬜ Phase 7 — Hook/plugin system + example plugin
 
@@ -79,10 +79,14 @@ selftaught/
 │   │   ├── server/middleware/auth.ts    # resolve Actor fresh dari DB per /api/* request
 │   │   ├── server/utils/require-capability.ts
 │   │   └── shared/types/auth.d.ts       # augment #auth-utils User type (WAJIB di shared/, lihat Gotcha #3)
-│   │   ├── app/pages/{media,categories,tags}.vue  # media library + taxonomy CRUD
+│   │   ├── app/pages/{media,categories,tags,trash}.vue  # media library + taxonomy CRUD + trash
 │   │   ├── app/components/TaxonomyManager.vue     # shared component for categories.vue/tags.vue
+│   │   ├── app/utils/api.ts                       # apiFetch/useApiFetch — MANDATORY, see Gotcha #13
 │   │   ├── server/api/media/{index,[id]}.{get,post,delete}.ts
 │   │   ├── server/api/taxonomy/[taxonomy]/{index,[id]}.{get,post,delete}.ts
+│   │   ├── server/api/posts/[id]/{submit,schedule,trash,untrash}.post.ts
+│   │   ├── server/api/posts/[id]/revisions/index.get.ts + [revisionId]/restore.post.ts
+│   │   ├── server/tasks/content/publish-scheduled.ts  # Nitro cron, "* * * * *"
 │   │   └── server/routes/media/[...path].get.ts   # serves uploaded files from MEDIA_LOCAL_PATH
 │   └── frontend/                # Nuxt 4, port 3001 — public site, extends themes/default
 │       ├── app/pages/index.vue, blog/{index,[slug]}.vue, category/[slug].vue, tag/[slug].vue
@@ -236,6 +240,23 @@ pnpm --filter @selftaught/core db:seed
     `featuredMediaUrl` yang sudah di-resolve oleh endpoint post) untuk dapat URL
     yang benar.
 
+13. **PENTING — Nuxt typed-fetch meledak ("Excessive stack depth comparing
+    types") begitu jumlah dynamic-segment API routes cukup banyak** (mulai
+    kena di admin sejak ~15 route termasuk yang bersarang seperti
+    `posts/[id]/revisions/[revisionId]/restore`). Ini kena di `nuxt typecheck`
+    (vue-tsc), bukan runtime. **Sudah di-fix permanen** dengan
+    `apps/admin/app/utils/api.ts` yang expose `apiFetch<T>()`/`useApiFetch<T>()`
+    — wrapper tipis di atas `$fetch`/`useFetch` yang meng-cast URL ke `any`
+    (skip typed-route matching sepenuhnya) dan pakai generic `<T>` eksplisit
+    untuk tipe response (lihat interface `PostDetail`, `PostSummary`,
+    `MediaItem`, `TermSummary`, `RevisionSummary` di file yang sama). **WAJIB
+    pakai `apiFetch`/`useApiFetch` (bukan `$fetch`/`useFetch` langsung) untuk
+    SEMUA panggilan API baru di admin** mulai sekarang — termasuk yang
+    urlnya masih literal statis, supaya tidak kambuh lagi begitu Phase 5-7
+    menambah lebih banyak route. Widening URL ke `string` biasa (percobaan
+    pertama, sekarang sudah dibuang) TIDAK cukup — harus `as any` yang benar-benar
+    skip type matching-nya.
+
 ## Kredensial dev (lokal, dari seed)
 
 - Admin login: **admin@example.com** / **changeme123!**
@@ -303,35 +324,72 @@ image+terms → publish → `/blog/[slug]` tampilkan gambar unggulan + link
 kategori/tag yang benar → `/category/[slug]` dan `/tag/[slug]` menampilkan
 post yang sesuai. Lint+typecheck bersih di semua package/app.
 
-## Cara lanjut ke Phase 4 (Revisions + full publishing workflow)
+## Ringkasan Phase 4 (selesai)
 
-Baca bagian "Phase 4" di plan file
+`revisions` table (migration `0003_rare_leper_queen.sql`, full snapshot bukan
+diff), `RevisionService` (snapshot/listForContent/getById). `ContentService`
+dirombak total: `transitionStatus(actor, id, next, opts?)` generik dengan
+`ALLOWED_TRANSITIONS` map yang menegakkan state machine penuh (draft↔pending↔
+scheduled→published, apa saja→trashed→draft), method turunan tipis
+(`publish`/`unpublish`/`submitForReview`/`schedule`/`trash`/`restoreFromTrash`),
+`restoreRevision` (snapshot state SEKARANG dulu sebelum overwrite, jadi restore
+sendiri bisa di-undo), dan `publishDueScheduled()` untuk dipanggil dari Nitro
+task (system-level action, tidak butuh `actor`/capability check — cron bukan
+user). `ContentService` sekarang butuh `RevisionService` di constructor
+(lihat `packages/core/src/server.ts`). Nitro scheduled task
+`apps/admin/server/tasks/content/publish-scheduled.ts` (nama task
+`content:publish-scheduled`, dari path `server/tasks/content/publish-scheduled.ts`)
+jalan tiap menit via `nitro.scheduledTasks: { "* * * * *": [...] }` +
+`nitro.experimental.tasks: true` di `apps/admin/nuxt.config.ts`. Admin UI:
+action bar `posts/[id].vue` sekarang punya tombol kondisional sesuai status
+(Ajukan Review/Jadwalkan/Publish/Batalkan/Pindah ke Trash/Pulihkan/Hapus
+Permanen) + panel Revisions dengan tombol "Pulihkan versi ini"; halaman baru
+`/trash`.
+
+**Terverifikasi end-to-end via curl**, termasuk menunggu cron beneran jalan
+(bukan simulasi): create → update (snapshot revisi v1 sebelum jadi v2,
+terverifikasi isi revisinya benar) → submit review (draft→pending) → schedule
+dengan `scheduledAt` di masa lalu → **tunggu ~45 detik, Nitro cron beneran
+auto-publish-kan** → restore revisi (snapshot v2 dulu, balik ke v1, isi
+konten terverifikasi benar berubah) → trash → untrash → **transisi ilegal
+(trashed→published) ditolak** oleh state machine. Lint+typecheck bersih di
+semua package/app.
+
+**Keterbatasan kecil yang diketahui (belum di-fix, tidak blocking)**: error
+domain (`assertCan`/`transitionStatus` throw `Error` biasa) saat ini muncul
+ke client sebagai HTTP 500 (bukan 400/403) karena h3's `defineEventHandler`
+membungkus thrown `Error` generik jadi 500 — pesannya tetap benar dan tampil
+ke user (`statusMessage`), cuma status code-nya kurang presisi secara REST.
+Perbaikan idealnya: custom error classes (`CapabilityError`, `TransitionError`)
++ mapping ke `createError({statusCode, ...})` di boundary API. Belum krusial
+karena `requireCapability` di API layer sudah menangkap kasus paling umum
+(401/403 yang benar); ini cuma soal defense-in-depth di service layer.
+
+## Cara lanjut ke Phase 5 (SEO subsystem)
+
+Baca bagian "Phase 5" di plan file
 (`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`). Ringkas:
 
-1. `packages/core/src/db/schema/revisions.ts` — tabel `revisions` (contentId,
-   authorId, title, excerpt, content jsonb, revisionType enum('revision','autosave'),
-   createdAt) — full snapshot, bukan diff
-2. `RevisionService` (snapshot on every save di `ContentService.update`, listRevisions,
-   restoreRevision — restore juga snapshot state SEBELUM restore sebagai revision baru)
-3. State machine penuh di `ContentService.transitionStatus`: `draft → pending →
-   published`, `draft → scheduled → published`, `any → trashed → draft/purge`.
-   `content_status` enum SUDAH punya semua value (`draft/pending/scheduled/
-   published/trashed`) sejak Phase 2 — tidak perlu ALTER TYPE, tinggal
-   diimplementasikan logic transisinya
-4. Nitro scheduled task `apps/admin/server/tasks/publish-scheduled.ts` — cron
-   tiap menit, query `content` where `status='scheduled' AND scheduledAt <= now()`,
-   transisi ke `published`. Daftarkan di `nuxt.config.ts` via
-   `nitro.scheduledTasks` + `nitro.experimental.tasks: true`
-5. Admin: tab Revisions di editor post (list + restore), tombol "Ajukan Review"
-   (draft→pending, capability `edit_posts`), "Jadwalkan" (input datetime →
-   draft/pending→scheduled, capability `publish_posts`), halaman Trash
-   (list status=trashed, restore/purge)
+1. `packages/core/src/db/schema/seo.ts` — tabel `content_seo` (contentId 1:1 PK/FK
+   ke `content.id`, title, description, ogImageMediaId, canonicalUrl, noindex,
+   structuredDataOverride jsonb) + tabel `settings` (key pk, value jsonb) untuk
+   default SEO site-wide (site title, default OG image, dll)
+2. `SeoService` — `resolve(content)` (fallback ke title/excerpt content lalu ke
+   `settings` kalau field SEO kosong), `generateJsonLd(content)` (Article/
+   BlogPosting untuk post, WebPage untuk page, merge dengan
+   `structuredDataOverride` kalau admin isi manual)
+3. Admin: panel SEO di sidebar editor post (title/description/OG
+   image-picker pakai pola yang sama seperti featured-image picker/canonical/
+   noindex toggle), halaman Settings (General + SEO defaults)
+4. Frontend: `useSeoMeta()`/`useHead()` di `blog/[slug].vue` (dan halaman
+   lain) pakai hasil `SeoService.resolve()`, `server/routes/sitemap.xml.ts`
+   (query semua published content + taxonomy archive, hormati `noindex`),
+   `server/routes/robots.txt.ts` (toggle via `settings`)
 
 Ikuti pola yang SUDAH ada: service menerima `Database` di constructor, singleton
-di `packages/core/src/server.ts`, capability check dua lapis. `RevisionService`
-sebaiknya dipanggil DARI `ContentService.update`/`transitionStatus` (bukan dari
-API layer terpisah) supaya setiap save selalu ter-snapshot tanpa bisa dilupakan
-oleh caller manapun.
+di `packages/core/src/server.ts`, zod schema di `packages/core/src/shared/`.
+**WAJIB** pakai `apiFetch`/`useApiFetch` dari `apps/admin/app/utils/api.ts`
+untuk endpoint baru (lihat Gotcha #13) — jangan `$fetch`/`useFetch` langsung.
 
 ## Git
 

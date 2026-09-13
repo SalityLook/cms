@@ -22,6 +22,13 @@
       "when": 1789307886086,
       "tag": "0002_grey_weapon_omega",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1789308440174,
+      "tag": "0003_rare_leper_queen",
+      "breakpoints": true
     }
   ]
 }

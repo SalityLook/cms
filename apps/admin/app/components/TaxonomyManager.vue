@@ -1,7 +1,7 @@
 <script setup lang="ts">
 const props = defineProps<{ taxonomy: string; label: string }>();
 
-const { data: terms, refresh } = await useFetch(`/api/taxonomy/${props.taxonomy}`);
+const { data: terms, refresh } = await useApiFetch<TermSummary[]>(`/api/taxonomy/${props.taxonomy}`);
 const name = ref("");
 const slug = ref("");
 const error = ref("");
@@ -23,7 +23,7 @@ async function onCreate() {
   error.value = "";
   saving.value = true;
   try {
-    await $fetch(`/api/taxonomy/${props.taxonomy}`, {
+    await apiFetch(`/api/taxonomy/${props.taxonomy}`, {
       method: "POST",
       body: { name: name.value, slug: slug.value }
     });
@@ -38,7 +38,7 @@ async function onCreate() {
 }
 
 async function onDelete(id: string) {
-  await $fetch(`/api/taxonomy/${props.taxonomy}/${id}`, { method: "DELETE" });
+  await apiFetch(`/api/taxonomy/${props.taxonomy}/${id}`, { method: "DELETE" });
   await refresh();
 }
 </script>

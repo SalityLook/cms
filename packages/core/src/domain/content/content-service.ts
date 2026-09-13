@@ -1,12 +1,14 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lte } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { content } from "../../db/schema/content";
+import type { RevisionService } from "../../domain/revisions/revision-service";
 import type { CapabilityKey } from "../../registry/capabilities";
 import { type ContentTypeDefinition, contentTypeRegistry } from "../../registry/content-types";
 import type { ContentDocument } from "../../shared/content-doc";
 import type { Actor } from "../../shared/types";
 
 type ContentRow = typeof content.$inferSelect;
+export type ContentStatus = ContentRow["status"];
 
 export interface CreateContentInput {
   type: string;
@@ -26,11 +28,27 @@ export interface UpdateContentInput {
 
 export interface ListContentFilters {
   type?: string;
-  status?: ContentRow["status"];
+  status?: ContentStatus;
 }
 
+/**
+ * Which statuses a piece of content may transition to from its current status.
+ * Enforced in transitionStatus() so no caller (API route, task, future plugin)
+ * can skip the workflow by calling the DB directly through this service.
+ */
+const ALLOWED_TRANSITIONS: Record<ContentStatus, ContentStatus[]> = {
+  draft: ["pending", "scheduled", "published", "trashed"],
+  pending: ["draft", "scheduled", "published", "trashed"],
+  scheduled: ["draft", "published", "trashed"],
+  published: ["draft", "trashed"],
+  trashed: ["draft"]
+};
+
 export class ContentService {
-  constructor(private readonly db: Database) {}
+  constructor(
+    private readonly db: Database,
+    private readonly revisions: RevisionService
+  ) {}
 
   async create(actor: Actor, input: CreateContentInput): Promise<ContentRow> {
     const definition = this.requireContentType(input.type);
@@ -60,6 +78,8 @@ export class ContentService {
     const definition = this.requireContentType(existing.type);
     this.assertOwnershipOrCapability(actor, existing, definition);
 
+    await this.snapshotCurrent(actor, existing);
+
     const [row] = await this.db
       .update(content)
       .set({ ...input, updatedAt: new Date() })
@@ -72,38 +92,117 @@ export class ContentService {
     return row;
   }
 
-  async publish(actor: Actor, id: string): Promise<ContentRow> {
+  async transitionStatus(
+    actor: Actor,
+    id: string,
+    next: ContentStatus,
+    opts?: { scheduledAt?: Date }
+  ): Promise<ContentRow> {
     const existing = await this.requireExisting(id);
     const definition = this.requireContentType(existing.type);
-    this.assertCan(actor, definition.capabilityMap.publish);
+
+    if (!ALLOWED_TRANSITIONS[existing.status].includes(next)) {
+      throw new Error(`Cannot transition content from ${existing.status} to ${next}`);
+    }
+
+    if (next === "published" || next === "scheduled") {
+      this.assertCan(actor, definition.capabilityMap.publish);
+    } else {
+      this.assertOwnershipOrCapability(actor, existing, definition);
+    }
 
     const [row] = await this.db
       .update(content)
-      .set({ status: "published", publishedAt: new Date(), updatedAt: new Date() })
+      .set({
+        status: next,
+        publishedAt: next === "published" ? new Date() : existing.publishedAt,
+        scheduledAt: next === "scheduled" ? (opts?.scheduledAt ?? null) : null,
+        updatedAt: new Date()
+      })
       .where(eq(content.id, id))
       .returning();
 
     if (!row) {
-      throw new Error("Failed to publish content");
+      throw new Error("Failed to transition content status");
     }
     return row;
   }
 
-  async unpublish(actor: Actor, id: string): Promise<ContentRow> {
+  publish(actor: Actor, id: string) {
+    return this.transitionStatus(actor, id, "published");
+  }
+
+  unpublish(actor: Actor, id: string) {
+    return this.transitionStatus(actor, id, "draft");
+  }
+
+  submitForReview(actor: Actor, id: string) {
+    return this.transitionStatus(actor, id, "pending");
+  }
+
+  schedule(actor: Actor, id: string, scheduledAt: Date) {
+    return this.transitionStatus(actor, id, "scheduled", { scheduledAt });
+  }
+
+  trash(actor: Actor, id: string) {
+    return this.transitionStatus(actor, id, "trashed");
+  }
+
+  restoreFromTrash(actor: Actor, id: string) {
+    return this.transitionStatus(actor, id, "draft");
+  }
+
+  /** Called by the Nitro scheduled task — a system action, not tied to any user's capabilities. */
+  async publishDueScheduled(): Promise<ContentRow[]> {
+    const due = await this.db.query.content.findMany({
+      where: and(eq(content.status, "scheduled"), lte(content.scheduledAt, new Date()))
+    });
+
+    const published: ContentRow[] = [];
+    for (const item of due) {
+      const [row] = await this.db
+        .update(content)
+        .set({ status: "published", publishedAt: new Date(), scheduledAt: null, updatedAt: new Date() })
+        .where(eq(content.id, item.id))
+        .returning();
+      if (row) {
+        published.push(row);
+      }
+    }
+    return published;
+  }
+
+  async restoreRevision(actor: Actor, id: string, revisionId: string): Promise<ContentRow> {
     const existing = await this.requireExisting(id);
     const definition = this.requireContentType(existing.type);
     this.assertOwnershipOrCapability(actor, existing, definition);
 
+    const revision = await this.revisions.getById(revisionId);
+    if (!revision || revision.contentId !== id) {
+      throw new Error("Revision not found");
+    }
+
+    await this.snapshotCurrent(actor, existing);
+
     const [row] = await this.db
       .update(content)
-      .set({ status: "draft", publishedAt: null, updatedAt: new Date() })
+      .set({
+        title: revision.title,
+        excerpt: revision.excerpt,
+        content: revision.content,
+        updatedAt: new Date()
+      })
       .where(eq(content.id, id))
       .returning();
 
     if (!row) {
-      throw new Error("Failed to unpublish content");
+      throw new Error("Failed to restore revision");
     }
     return row;
+  }
+
+  listRevisions(id: string) {
+    return this.revisions.listForContent(id);
   }
 
   async delete(actor: Actor, id: string): Promise<void> {
@@ -129,6 +228,16 @@ export class ContentService {
     return this.db.query.content.findMany({
       where: conditions.length ? and(...conditions) : undefined,
       orderBy: [desc(content.updatedAt)]
+    });
+  }
+
+  private snapshotCurrent(actor: Actor, existing: ContentRow) {
+    return this.revisions.snapshot({
+      contentId: existing.id,
+      authorId: actor.id,
+      title: existing.title,
+      excerpt: existing.excerpt,
+      content: existing.content
     });
   }
 
