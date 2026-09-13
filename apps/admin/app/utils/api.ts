@@ -130,3 +130,22 @@ export interface ContentSeo {
 }
 
 export type SettingsMap = Record<string, unknown>;
+
+export type UserStatus = "active" | "suspended";
+
+export interface UserSummary {
+  id: string;
+  email: string;
+  displayName: string;
+  status: UserStatus;
+  createdAt: string;
+  roles: string[];
+}
+
+export interface RoleSummary {
+  key: string;
+  name: string;
+  description: string | null;
+  isSystem: boolean;
+  capabilities: string[];
+}

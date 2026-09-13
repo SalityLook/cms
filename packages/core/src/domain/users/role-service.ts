@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { capabilities, roleCapabilities, roles, userRoles } from "../../db/schema/users";
 import type { CapabilityKey } from "../../registry/capabilities";
@@ -38,6 +38,42 @@ export class RoleService {
       .from(userRoles)
       .innerJoin(roles, eq(roles.id, userRoles.roleId))
       .where(eq(userRoles.userId, userId));
+    return rows.map((row) => row.key);
+  }
+
+  async removeRole(userId: string, roleKey: string): Promise<void> {
+    const role = await this.getRoleByKey(roleKey);
+    if (!role) {
+      return;
+    }
+    await this.db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, role.id)));
+  }
+
+  /** Replaces a user's full role set in one call — diffs against current roles so it's just the add/remove needed. */
+  async setRolesForUser(userId: string, roleKeys: string[]): Promise<void> {
+    const current = await this.rolesForUser(userId);
+    const toAdd = roleKeys.filter((key) => !current.includes(key));
+    const toRemove = current.filter((key) => !roleKeys.includes(key));
+    await Promise.all([
+      ...toAdd.map((key) => this.assignRole(userId, key)),
+      ...toRemove.map((key) => this.removeRole(userId, key))
+    ]);
+  }
+
+  listCapabilities() {
+    return this.db.query.capabilities.findMany({ orderBy: (row, { asc }) => [asc(row.key)] });
+  }
+
+  async capabilitiesForRole(roleKey: string): Promise<string[]> {
+    const role = await this.getRoleByKey(roleKey);
+    if (!role) {
+      return [];
+    }
+    const rows = await this.db
+      .select({ key: capabilities.key })
+      .from(roleCapabilities)
+      .innerJoin(capabilities, eq(capabilities.id, roleCapabilities.capabilityId))
+      .where(eq(roleCapabilities.roleId, role.id));
     return rows.map((row) => row.key);
   }
 

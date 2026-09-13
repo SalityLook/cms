@@ -34,7 +34,21 @@ export class UserService {
   }
 
   list() {
-    return this.db.query.users.findMany();
+    return this.db.query.users.findMany({ orderBy: (row, { asc }) => [asc(row.email)] });
+  }
+
+  async setStatus(id: string, status: "active" | "suspended") {
+    const [user] = await this.db.update(users).set({ status, updatedAt: new Date() }).where(eq(users.id, id)).returning();
+    return user;
+  }
+
+  async updateProfile(id: string, input: { displayName?: string }) {
+    const [user] = await this.db
+      .update(users)
+      .set({ ...input, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
   }
 
   async verifyCredentials(email: string, password: string) {

@@ -610,11 +610,9 @@ dipertimbangkan dan didokumentasikan di titik ia di-skip:
    input `menuOrder` untuk hierarki halaman ala WordPress.
 2. **`settings.homepageContentId` (static front page)** — bergantung pada #1,
    jadi ikut tertunda. Homepage sekarang cuma mode "latest posts".
-3. **Roles & Capabilities admin UI** — RBAC penuh di level DB/service sejak
-   Phase 1, tapi TIDAK ADA halaman admin untuk lihat/assign role atau
-   capability ke user (user baru cuma bisa dibuat lewat `pnpm db:seed` atau
-   psql manual). Perlu: `/users` (list + assign role) dan `/roles` (lihat
-   capability per role, opsional bikin role custom).
+3. ~~**Roles & Capabilities admin UI**~~ — **SELESAI** (lihat "Ringkasan:
+   Users & Roles admin UI" di bawah). Sisa yang masih belum ada: bikin role
+   CUSTOM lewat UI (di luar 4 `SYSTEM_ROLES` bawaan) — lihat #6.
 4. **Custom error classes untuk HTTP status code presisi** (dicatat di Phase
    4) — service layer (`assertCan`, `transitionStatus`, dst.) throw `Error`
    polos yang jadi HTTP 500 generik lewat h3, bukan 400/403 yang lebih tepat.
@@ -623,15 +621,38 @@ dipertimbangkan dan didokumentasikan di titik ia di-skip:
    ini berbagi satu capability `edit_pages` untuk edit/publish/delete
    sekaligus (lihat `ContentTypeRegistry` di Phase 2), beda dari "post" yang
    granular. Cukup untuk sekarang karena UI/API "page" sendiri belum ada (#1).
-6. **Multi-role per user, role custom lewat UI** — schema `user_roles` sudah
-   many-to-many sejak Phase 1, tapi belum ada UI untuk assign lebih dari satu
-   role atau bikin role baru di luar 4 SYSTEM_ROLES bawaan.
+6. **Role CUSTOM lewat UI** — `RoleService`/`/roles` sekarang cuma VIEW
+   read-only untuk 4 `SYSTEM_ROLES` bawaan (+ capability tambahan dari
+   plugin). Assign multi-role ke user SUDAH bisa lewat `/users/[id]`
+   (checkbox, `RoleService.setRolesForUser`), tapi bikin role BARU (nama,
+   pilih capability sendiri) di luar 4 bawaan belum ada UI/API-nya.
 7. **`packages/ui`** — package kosong sejak Phase 0, tidak pernah terpakai.
    Aman dihapus atau diisi kalau nanti ada komponen Vue yang genuinely
    dipakai bersama admin+frontend+theme.
 
 Tidak ada satu pun dari ini yang blocking — semuanya extension yang lurus ke
 depan mengikuti pola yang sudah established di codebase.
+
+## Pekerjaan pasca-roadmap #1: Users & Roles admin UI (selesai)
+
+`RoleService` dapat 4 method baru: `removeRole`, `setRolesForUser` (diff
+add/remove terhadap role saat ini — dipakai UI untuk "replace" full role set
+user via checkbox), `listCapabilities`, `capabilitiesForRole`. `UserService`
+dapat `setStatus`/`updateProfile`. Endpoint baru di admin:
+`GET/POST /api/users`, `GET/PATCH /api/users/[id]` (capability
+`manage_users`), `GET /api/roles` (read-only, capability `manage_users`
+juga — belum ada capability `manage_roles` terpisah, dianggap cukup satu
+capability untuk keduanya di v1 ini). Halaman: `/users` (list + badge
+status/role), `/users/new` (create + assign role via toggle button),
+`/users/[id]` (edit displayName/status/roles), `/roles` (viewer read-only
+capability per role — BUKAN pembuat role custom, lihat item #6 di atas).
+
+**Terverifikasi via curl**: list roles (termasuk capability plugin dari
+Phase 7 ikut ter-hitung di role `admin`) → buat user baru dengan role
+`author` → login sebagai user itu → capability yang di-resolve PAS sama
+seperti `SYSTEM_ROLES.author` → user itu ditolak (403) akses endpoint
+`manage_users` → admin suspend + lepas semua role user itu → user yang
+di-suspend tidak bisa login lagi (401). Lint+typecheck bersih.
 
 ## Git
 
