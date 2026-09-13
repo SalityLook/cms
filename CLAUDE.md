@@ -32,8 +32,8 @@ tanpa perlu re-derive keputusan yang sudah diambil.
 
 - ✅ **Phase 0 — Scaffolding** (commit `1954957`)
 - ✅ **Phase 1 — Core schema + auth + RBAC** (commit `86e992e`)
-- ⬜ Phase 2 — Content CRUD + block editor (**berikutnya**)
-- ⬜ Phase 3 — Taxonomies + media
+- ✅ **Phase 2 — Content CRUD + block editor** (lihat bagian di bawah)
+- ⬜ Phase 3 — Taxonomies + media (**berikutnya**)
 - ⬜ Phase 4 — Revisions + full publishing workflow
 - ⬜ Phase 5 — SEO subsystem
 - ⬜ Phase 6 — Frontend polish + theme layer
@@ -58,21 +58,42 @@ selftaught/
 │   │   ├── src/shared/                  # types.ts (AuthUser/Actor), auth-schemas.ts (zod loginSchema)
 │   │   ├── src/server.ts                # server-only barrel + singleton services (userService, roleService, permissionService)
 │   │   └── src/shared/index.ts          # client-safe barrel (import from "@selftaught/core")
-│   ├── blocks/                  # @selftaught/blocks — masih kosong (Phase 2)
+│   ├── blocks/                  # @selftaught/blocks — render side dari block editor
+│   │   ├── src/schema.ts                # re-export BlockNode/ContentDocument dari @selftaught/core (lihat catatan di bawah)
+│   │   ├── src/registry.ts              # BlockRegistry — map node.type -> Vue render component
+│   │   ├── src/default-blocks.ts        # registrasi block bawaan (side-effect import)
+│   │   ├── src/render/BlockRenderer.vue # komponen rekursif utama (dipakai frontend)
+│   │   ├── src/render/{Paragraph,Heading,BulletList,OrderedList,ListItem,Blockquote,CodeBlock,Image,HardBreak,HorizontalRule}.vue
+│   │   ├── src/render/{MarkWrap,MarkText}.vue  # inline marks (bold/italic/code/strike/link), nested via rekursi
+│   │   └── src/shims.d.ts               # `declare module "*.vue"` supaya `tsc`/`vue-tsc` standalone jalan
 │   ├── tailwind-config/         # shared Tailwind v4 theme.css tokens
 │   └── ui/                      # kosong, opsional (v1-light)
 ├── apps/
 │   ├── admin/                   # Nuxt 4, port 3000 — dashboard
 │   │   ├── app/pages/login.vue, index.vue (dashboard shell, protected)
+│   │   ├── app/pages/posts/{index,new,[id]}.vue  # list, create, edit+publish/unpublish/delete
+│   │   ├── app/components/BlockEditor.vue        # Tiptap (@tiptap/vue-3 + starter-kit + image) v-model ContentDocument
 │   │   ├── app/middleware/auth.ts       # redirect ke /login kalau !loggedIn
 │   │   ├── server/api/auth/{login,logout,me}.{post,get}.ts
+│   │   ├── server/api/posts/{index,[id]}.{get,post,patch,delete}.ts + [id]/{publish,unpublish}.post.ts
 │   │   ├── server/middleware/auth.ts    # resolve Actor fresh dari DB per /api/* request
 │   │   ├── server/utils/require-capability.ts
 │   │   └── shared/types/auth.d.ts       # augment #auth-utils User type (WAJIB di shared/, lihat Gotcha #3)
 │   └── frontend/                # Nuxt 4, port 3001 — public site, extends themes/default
+│       ├── app/pages/index.vue, blog/index.vue, blog/[slug].vue
+│       └── server/api/posts/{index,[slug]}.get.ts  # read-only, hanya status=published
 ├── themes/default/              # Nuxt Layer kosong (reference theme, diisi Phase 6)
 └── plugins/                     # kosong (Phase 7)
 ```
+
+**Catatan penyimpangan kecil dari plan awal**: plan menyebut `packages/blocks/src/schema.ts`
+sebagai tempat definisi `BlockNode`/`ContentDocument`. Karena `ContentService` di
+`packages/core` juga perlu tipe itu untuk mengetik kolom jsonb (`$type<ContentDocument>()`),
+dan arah dependency yang sudah ditetapkan plan adalah **blocks → core, bukan sebaliknya**,
+tipe kanonik ini sekarang didefinisikan di `packages/core/src/shared/content-doc.ts`
+(termasuk `contentDocumentSchema` zod untuk validasi body API). `packages/blocks/src/schema.ts`
+tinggal re-export dari `@selftaught/core`. Ini konsisten dengan aturan dependency yang
+sudah eksplisit di plan, cuma lokasi file-nya digeser.
 
 ## Environment lokal (sudah di-setup, tidak perlu diulang)
 
@@ -164,15 +185,29 @@ pnpm --filter @selftaught/core db:seed
    curl, ambil cookie value dari header `Set-Cookie` response login lalu kirim
    manual via `-H "Cookie: nuxt-session=..."` (bukan `-b/-c` cookie jar biasa).
 
-8. **Kalau lupa `source .env` sebelum jalankan `pnpm dev` manual di shell**,
-   `DATABASE_URL` kosong → `packages/core/src/db/client.ts` throw di level import
-   (`db/client.ts` dieksekusi begitu ada request pertama yang lewat
-   `server/middleware/auth.ts`, yang jalan di **semua** request termasuk halaman
-   non-API) → seluruh dev server crash (`ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL`).
-   Selalu `set -a; source .env; set +a` dulu sebelum `pnpm --filter ... dev` di
-   luar konteks `pnpm install`/npm scripts normal (yang otomatis load `.env` lewat
-   Nuxt/Nitro saat pakai `pnpm run dev` biasa — masalah ini murni saat testing
-   manual pakai `pnpm --filter` langsung di shell tanpa dotenv loader).
+8. **`pnpm --filter <app> dev` TIDAK otomatis membaca `.env` di root** — Nuxt/Nitro
+   cuma cari `.env` di rootDir app itu sendiri (`apps/admin/.env`), bukan root
+   monorepo, dan `pnpm --filter` mengganti cwd ke folder app tersebut. **Sudah
+   di-fix**: root scripts (`dev:admin`, `dev:frontend`, `build:*`, `db:migrate`,
+   `db:seed`, `db:studio` di `package.json`) sekarang dibungkus
+   `dotenv -e .env -- ...` (package `dotenv-cli`). Pakai `pnpm dev:admin` /
+   `pnpm db:migrate` dst dari root seperti biasa — jangan panggil
+   `pnpm --filter @selftaught/admin dev` langsung kalau butuh `DATABASE_URL`
+   (kecuali sudah `source .env` manual dulu di shell, yang tetap valid untuk
+   testing cepat/curl karena env terwarisi ke child process apa pun).
+
+9. **`packages/blocks` yang mengekspor komponen `.vue` dari barrel `.ts`
+   (`export { default as BlockRenderer } from "./render/BlockRenderer.vue"`)**
+   butuh `packages/blocks/src/shims.d.ts` (`declare module "*.vue"`) supaya
+   `tsc`/`vue-tsc --noEmit` standalone di package itu tidak error "cannot find
+   module". Nuxt app yang mengonsumsinya tidak butuh shim ini (Nuxt sudah
+   menyediakan shim `*.vue` sendiri secara global).
+
+10. **Komponen Vue rekursif** (`BlockRenderer.vue` memanggil dirinya sendiri
+    untuk children, `MarkWrap.vue` memanggil dirinya sendiri untuk nested
+    marks) **jalan tanpa registrasi eksplisit** di Vue 3 `<script setup>` —
+    compiler SFC otomatis mendaftarkan komponen di bawah nama filename-nya.
+    Tidak perlu `components: { BlockRenderer }` manual.
 
 ## Kredensial dev (lokal, dari seed)
 
@@ -199,30 +234,50 @@ pnpm typecheck       # -r --parallel typecheck di semua package (core: tsc, admi
 pnpm lint            # eslint . (root config untuk packages/*, tiap app pakai config sendiri — lihat Gotcha #4)
 ```
 
-## Cara lanjut ke Phase 2 (Content CRUD + block editor)
+## Ringkasan Phase 2 (selesai)
 
-Baca bagian "Phase 2" di plan file
+`content`/`content_meta` table (migration `0001_bouncy_winter_soldier.sql`),
+`ContentTypeRegistry` (post + page terdaftar, tapi UI/API CRUD baru dibangun
+untuk **post** — "page" baru terdaftar di registry, belum ada halaman admin/API
+sendiri, jadi itu bagian yang masih tersisa dan gampang ditambah dengan pola
+yang sama persis seperti posts), `ContentService` (create/update/publish/
+unpublish/delete/getById/getBySlug/list — state machine penuh draft→pending→
+scheduled masih Phase 4), `@selftaught/blocks` (BlockRegistry + 10 default
+render component + BlockRenderer rekursif), `BlockEditor.vue` di admin (Tiptap
+StarterKit + Image), full CRUD posts di admin (`/posts`, `/posts/new`,
+`/posts/[id]`), dan halaman publik `/blog`, `/blog/[slug]` di frontend yang
+hanya menampilkan post `status=published`.
+
+**Terverifikasi end-to-end via curl**: login → create draft (belum tampil di
+frontend, 404) → publish (langsung tampil, block content ter-render benar:
+paragraph, heading h2) → unpublish → update title → delete. Semua lint+typecheck
+bersih di `core`/`blocks`/`admin`/`frontend`.
+
+## Cara lanjut ke Phase 3 (Taxonomies + media)
+
+Baca bagian "Phase 3" di plan file
 (`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`). Ringkas:
 
-1. `packages/core/src/db/schema/content.ts` — tabel `content` (discriminator `type`
-   untuk post/page, kolom `content jsonb` = ProseMirror doc, `status` enum
-   draft/published untuk sekarang) + `content_meta` (EAV, key/value jsonb)
-2. `packages/core/src/registry/` — `ContentTypeRegistry` (register `post`, `page`
-   dengan `supports`/`capabilityMap`)
-3. `packages/core/src/domain/content/content-service.ts` — CRUD dasar (state
-   machine penuh baru Phase 4)
-4. `packages/blocks/src/schema.ts` — `BlockNode`/`ContentDocument` type (lihat
-   plan untuk shape persis), `packages/blocks/src/registry.ts` — `BlockRegistry`
-   dengan block dasar (paragraph/heading/image/list/quote/code), editor extension
-   Tiptap + Vue render component per block
-5. `apps/admin` — posts list + block editor page, `server/api/posts/*`
-   (pakai `requireCapability(event, "edit_posts"|"publish_posts")` pola yang
-   sudah ada di `server/utils/require-capability.ts`)
-6. `apps/frontend/pages/blog/[slug].vue` + `<BlockRenderer>` dari `@selftaught/blocks`
+1. `packages/core/src/db/schema/taxonomy.ts` — `terms` (taxonomy/slug/name/
+   parentId, unique(taxonomy, slug)) + `content_terms` (many-to-many ke `content`)
+2. `packages/core/src/db/schema/media.ts` — `media` table (fileName, mimeType,
+   sizeBytes, path, width/height, altText, uploadedById). Setelah ini ada,
+   tambahkan FK `content.featuredMediaId -> media.id` dan
+   `users.avatarMediaId -> media.id` lewat migration baru (kolomnya sudah ada
+   di schema `content`/`users` tapi belum di-reference — lihat komentar di plan
+   section domain design soal avatarMediaId yang sengaja ditunda)
+3. `TaxonomyService` (createTerm/assignTerms/listByTaxonomy) dan `MediaService`
+   + `StorageAdapter` interface (`LocalDiskStorage` dulu, path dari
+   `MEDIA_LOCAL_PATH` di `.env`) + `sharp` untuk thumbnail
+4. Admin: halaman categories/tags CRUD, media library + upload endpoint,
+   taxonomy/featured-image picker di editor post
+5. Frontend: `app/pages/category/[slug].vue`, `tag/[slug].vue`
 
-Ikuti pola yang SUDAH ada dari Phase 1: service class menerima `Database` di
-constructor, singleton di-expose lewat `packages/core/src/server.ts`, capability
-check dua lapis (middleware fast-fail + service-layer `PermissionService.can`).
+Ikuti pola yang SUDAH ada: service class menerima `Database` di constructor,
+singleton di-expose lewat `packages/core/src/server.ts`, capability check dua
+lapis (`requireCapability` di API layer + assert di service layer), zod schema
+untuk validasi body request ditaruh di `packages/core/src/shared/` supaya bisa
+dipakai ulang oleh kedua app.
 
 ## Git
 

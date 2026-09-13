@@ -7,18 +7,17 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@selftaught/core": "workspace:*",
-    "@tiptap/core": "^2.11.2",
-    "@tiptap/starter-kit": "^2.11.2",
-    "@tiptap/vue-3": "^2.11.2"
+    "@selftaught/core": "workspace:*"
   },
   "peerDependencies": {
     "vue": "^3.5.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vue": "^3.5.42",
+    "vue-tsc": "^2.2.0"
   }
 }

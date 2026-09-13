@@ -21,13 +21,17 @@ async function onLogout() {
       </div>
     </header>
 
-    <main class="p-6">
+    <main class="p-6 space-y-4">
       <UCard>
         <p>
           Selamat datang, <strong>{{ user?.displayName }}</strong>.
         </p>
         <p class="text-sm text-gray-500 mt-2">Roles: {{ me?.roles.join(", ") }}</p>
         <p class="text-sm text-gray-500">Capabilities: {{ me?.capabilities.join(", ") }}</p>
+      </UCard>
+
+      <UCard>
+        <NuxtLink to="/posts" class="text-primary hover:underline">Kelola Posts →</NuxtLink>
       </UCard>
     </main>
   </div>

@@ -1,0 +1,22 @@
+import { blockRegistry } from "./registry";
+import Blockquote from "./render/Blockquote.vue";
+import BulletList from "./render/BulletList.vue";
+import CodeBlock from "./render/CodeBlock.vue";
+import HardBreak from "./render/HardBreak.vue";
+import Heading from "./render/Heading.vue";
+import HorizontalRule from "./render/HorizontalRule.vue";
+import ImageBlock from "./render/Image.vue";
+import ListItem from "./render/ListItem.vue";
+import OrderedList from "./render/OrderedList.vue";
+import Paragraph from "./render/Paragraph.vue";
+
+blockRegistry.register({ type: "paragraph", renderComponent: Paragraph });
+blockRegistry.register({ type: "heading", renderComponent: Heading });
+blockRegistry.register({ type: "bulletList", renderComponent: BulletList });
+blockRegistry.register({ type: "orderedList", renderComponent: OrderedList });
+blockRegistry.register({ type: "listItem", renderComponent: ListItem });
+blockRegistry.register({ type: "blockquote", renderComponent: Blockquote });
+blockRegistry.register({ type: "codeBlock", renderComponent: CodeBlock });
+blockRegistry.register({ type: "image", renderComponent: ImageBlock });
+blockRegistry.register({ type: "hardBreak", renderComponent: HardBreak });
+blockRegistry.register({ type: "horizontalRule", renderComponent: HorizontalRule });
