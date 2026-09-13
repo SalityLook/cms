@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: selftaught
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  admin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP: admin
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/selftaught
+    ports:
+      - "3000:3000"
+    volumes:
+      - media_data:/app/data/media
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP: frontend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/selftaught
+    ports:
+      - "3001:3000"
+    volumes:
+      - media_data:/app/data/media
+
+volumes:
+  postgres_data:
+  media_data:

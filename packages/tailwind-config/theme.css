@@ -1,0 +1,14 @@
+/*
+ * Shared Tailwind v4 design tokens for admin, frontend and themes.
+ * Consumed via: @import "@selftaught/tailwind-config/theme.css";
+ * Themes may override these tokens locally after importing this file.
+ */
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand-50: oklch(0.98 0.01 260);
+  --color-brand-100: oklch(0.94 0.03 260);
+  --color-brand-500: oklch(0.58 0.18 260);
+  --color-brand-600: oklch(0.5 0.19 260);
+  --color-brand-700: oklch(0.42 0.18 260);
+}

@@ -1,0 +1,29 @@
+{
+  "name": "@selftaught/core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/shared/index.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "db:seed": "tsx src/db/seed.ts",
+    "db:studio": "drizzle-kit studio",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "argon2": "^0.41.1",
+    "drizzle-orm": "^0.38.3",
+    "postgres": "^3.4.5",
+    "uuid": "^11.0.4",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.30.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

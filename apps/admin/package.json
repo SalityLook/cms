@@ -1,0 +1,23 @@
+{
+  "name": "@selftaught/admin",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev --port 3000",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "typecheck": "nuxt typecheck"
+  },
+  "dependencies": {
+    "@nuxt/ui": "^3.0.0",
+    "@selftaught/blocks": "workspace:*",
+    "@selftaught/core": "workspace:*",
+    "@selftaught/tailwind-config": "workspace:*",
+    "nuxt": "^4.5.2",
+    "nuxt-auth-utils": "^0.5.13",
+    "vue": "^3.5.42",
+    "vue-router": "^5.3.1"
+  }
+}

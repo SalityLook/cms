@@ -1,0 +1,30 @@
+{
+  "name": "selftaught",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@12.4.1",
+  "scripts": {
+    "dev:admin": "pnpm --filter @selftaught/admin dev",
+    "dev:frontend": "pnpm --filter @selftaught/frontend dev",
+    "build:admin": "pnpm --filter @selftaught/admin build",
+    "build:frontend": "pnpm --filter @selftaught/frontend build",
+    "db:generate": "pnpm --filter @selftaught/core db:generate",
+    "db:migrate": "pnpm --filter @selftaught/core db:migrate",
+    "db:seed": "pnpm --filter @selftaught/core db:seed",
+    "db:studio": "pnpm --filter @selftaught/core db:studio",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --parallel typecheck",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@nuxt/eslint-config": "^0.7.4",
+    "@types/node": "^22.10.5",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "vue-tsc": "^2.2.0"
+  }
+}
