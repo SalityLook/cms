@@ -1,12 +1,12 @@
 import { eq } from "drizzle-orm";
 import { hashPassword } from "../auth/password";
-import { CAPABILITIES, SYSTEM_ROLES } from "../registry/capabilities";
+import { capabilityRegistry, SYSTEM_ROLES } from "../registry/capabilities";
 import { db } from "./client";
 import { capabilities, roleCapabilities, roles, userRoles, users } from "./schema/users";
 
 async function seedCapabilities() {
-  for (const key of CAPABILITIES) {
-    await db.insert(capabilities).values({ key }).onConflictDoNothing();
+  for (const definition of capabilityRegistry.list()) {
+    await db.insert(capabilities).values({ key: definition.key }).onConflictDoNothing();
   }
 }
 

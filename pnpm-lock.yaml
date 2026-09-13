@@ -199,6 +199,9 @@ importers:
       '@selftaught/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@selftaught/example-plugin':
+        specifier: workspace:*
+        version: link:../../plugins/example-plugin
       '@selftaught/tailwind-config':
         specifier: workspace:*
         version: link:../../packages/tailwind-config
@@ -307,6 +310,22 @@ importers:
         version: 5.9.3
 
   packages/tailwind-config: {}
+
+  plugins/example-plugin:
+    dependencies:
+      '@selftaught/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
+      vue:
+        specifier: ^3.5.42
+        version: 3.5.42(typescript@5.9.3)
+      vue-tsc:
+        specifier: ^2.2.0
+        version: 2.2.12(typescript@5.9.3)
 
   themes/default:
     dependencies:

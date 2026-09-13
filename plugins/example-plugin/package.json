@@ -1,0 +1,21 @@
+{
+  "name": "@selftaught/example-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "exports": {
+    "./server": "./src/server.ts",
+    "./editor-panel": "./src/editor-panel.ts"
+  },
+  "dependencies": {
+    "@selftaught/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vue": "^3.5.42",
+    "vue-tsc": "^2.2.0"
+  }
+}

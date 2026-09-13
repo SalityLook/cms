@@ -14,6 +14,15 @@ Dokumen ini (`CLAUDE.md`) adalah ringkasan operasional + status terkini +
 gotcha yang sudah ditemukan, supaya pekerjaan bisa lanjut tanpa internet dan
 tanpa perlu re-derive keputusan yang sudah diambil.
 
+**STATUS: semua 8 fase (Phase 0-7) dari roadmap awal sudah selesai dan
+ter-commit.** CMS ini punya: auth+RBAC, content CRUD lengkap dengan block
+editor, taxonomies, media library, revisions, publishing workflow penuh
+(draft/pending/scheduled/published/trashed + cron auto-publish), SEO
+subsystem, theme layer yang swappable, dan hook/plugin system dengan contoh
+plugin yang benar-benar jalan. Lihat bagian "Item yang sengaja ditunda" di
+paling bawah dokumen ini untuk daftar hal yang BUKAN bug/lupa, melainkan
+keputusan scope sadar sepanjang pengerjaan (page CRUD, Roles admin UI, dll).
+
 ## Keputusan arsitektur (final, jangan diubah tanpa alasan kuat)
 
 1. **Database/ORM**: PostgreSQL + Drizzle ORM
@@ -36,8 +45,8 @@ tanpa perlu re-derive keputusan yang sudah diambil.
 - ✅ **Phase 3 — Taxonomies + media**
 - ✅ **Phase 4 — Revisions + full publishing workflow**
 - ✅ **Phase 5 — SEO subsystem**
-- ✅ **Phase 6 — Frontend polish + theme layer** (lihat bagian di bawah)
-- ⬜ Phase 7 — Hook/plugin system + example plugin (**berikutnya, fase terakhir**)
+- ✅ **Phase 6 — Frontend polish + theme layer**
+- ✅ **Phase 7 — Hook/plugin system + example plugin** (lihat bagian di bawah — **SEMUA 8 FASE SELESAI**)
 
 Detail lengkap tiap fase (deliverable, file yang harus dibuat) ada di bagian
 "Phased Build Roadmap" pada plan file yang disebut di atas. Jangan ulangi riset
@@ -53,10 +62,12 @@ selftaught/
 │   │   ├── src/db/client.ts             # drizzle(postgres) — export `db`
 │   │   ├── src/db/migrate.ts, seed.ts
 │   │   ├── src/domain/users/            # UserService, RoleService, PermissionService
-│   │   ├── src/registry/capabilities.ts # CAPABILITIES const + SYSTEM_ROLES (admin/editor/author/contributor)
+│   │   ├── src/registry/capabilities.ts # CAPABILITIES const (literal union, type-safe) + capabilityRegistry class (.register() untuk plugin) + SYSTEM_ROLES
+│   │   ├── src/hooks/hook-bus.ts        # HookBus: onAction/emitAction/onFilter/applyFilter, ActionMap augmentable
+│   │   ├── src/plugins/define-plugin.ts # definePlugin()/createPluginContext() — {hooks,contentTypes,taxonomies,capabilities}
 │   │   ├── src/auth/password.ts         # argon2 hash/verify
 │   │   ├── src/shared/                  # types.ts (AuthUser/Actor), auth-schemas.ts (zod loginSchema)
-│   │   ├── src/server.ts                # server-only barrel + singleton services (userService, roleService, permissionService)
+│   │   ├── src/server.ts                # server-only barrel + singleton services (userService, roleService, permissionService, dst)
 │   │   └── src/shared/index.ts          # client-safe barrel (import from "@selftaught/core")
 │   ├── blocks/                  # @selftaught/blocks — render side dari block editor
 │   │   ├── src/schema.ts                # re-export BlockNode/ContentDocument dari @selftaught/core (lihat catatan di bawah)
@@ -89,7 +100,12 @@ selftaught/
 │   │   ├── server/tasks/content/publish-scheduled.ts  # Nitro cron, "* * * * *"
 │   │   ├── server/api/posts/[id]/seo.{get,put}.ts, server/api/settings/index.{get,patch}.ts
 │   │   ├── app/pages/settings.vue
-│   │   └── server/routes/media/[...path].get.ts   # serves uploaded files from MEDIA_LOCAL_PATH
+│   │   ├── server/routes/media/[...path].get.ts   # serves uploaded files from MEDIA_LOCAL_PATH
+│   │   ├── plugins.config.ts              # daftar plugin server-side aktif (di root app, bukan app/)
+│   │   ├── server/plugins/00.load-plugins.ts  # Nitro plugin: jalankan setup() tiap plugin + sync capability ke DB
+│   │   ├── app/plugins/load-plugins.ts    # Nuxt app plugin: daftarkan editor panel plugin ke adminUIRegistry
+│   │   ├── app/utils/admin-ui-registry.ts # AdminUIRegistry (UI-only, TIDAK di core) — registerMenuItem/registerEditorPanel
+│   │   └── server/api/posts/[id]/meta.{get,put}.ts  # baca/tulis content_meta (dipakai plugin panel)
 │   └── frontend/                # Nuxt 4, port 3001 — TIPIS: cuma server/ + config, extends themes/default
 │       ├── nuxt.config.ts       # extends + routeRules (SWR 60s di /blog,/category,/tag) + runtimeConfig
 │       ├── server/api/posts/{index,[slug]}.get.ts       # index.get.ts: paginated {posts,page,totalPages}; [slug] includes resolved `seo`+`jsonLd`
@@ -100,7 +116,11 @@ selftaught/
 │   ├── package.json             # declare @selftaught/core+blocks (deps) & @nuxt/kit+tailwindcss/vite+nuxt+vue (devDeps)
 │   ├── nuxt.config.ts           # css + tailwindcss vite plugin, pakai createResolver() bukan `~/...` (Gotcha #14)
 │   └── app/{app.vue,error.vue,pages/{index,blog/{index,[slug]},category/[slug],tag/[slug]}.vue,assets/css/main.css}
-└── plugins/                     # kosong (Phase 7)
+└── plugins/example-plugin/      # @selftaught/example-plugin — bukti hook/registry/AdminUI extension points jalan
+    ├── package.json             # exports: "./server" (definePlugin), "./editor-panel" (Vue component wrapper)
+    ├── src/server.ts            # definePlugin({ id, setup(ctx) {...} }) — register capability + hook content:published
+    ├── src/EditorPanel.vue      # panel sidebar post editor, baca/tulis content_meta lewat $fetch polos
+    └── src/editor-panel.ts      # re-export .ts tipis dari .vue (lihat catatan "*.vue subpath export" di bawah)
 ```
 
 `packages/core/src/domain/{taxonomy,media}/` menambahkan `TaxonomyService` dan
@@ -291,6 +311,51 @@ pnpm --filter @selftaught/core db:seed
     kirim `Accept: text/html,...` dan akan dapat halaman error.vue yang
     benar. Untuk test manual via curl, tambahkan `-H "Accept: text/html"`.
 
+17. **PALING KRITIS — jangan sentuh `apps/admin/app/utils/api.ts` tanpa baca
+    ini dulu.** Riwayat 3 percobaan untuk fix Gotcha #13 (stack-depth) yang
+    masing-masing terlihat benar tapi TERNYATA rusak dengan cara berbeda:
+    - **Percobaan 1**: widen URL ke `string` biasa (`apiUrl()` helper) —
+      TIDAK memperbaiki stack-depth sama sekali, cuma memindahkan error.
+    - **Percobaan 2**: `$fetch(url as any, ...)` — memperbaiki stack-depth
+      untuk apiFetch, TAPI begitu jumlah route bertambah lagi (nambah
+      `posts/[id]/meta`), stack-depth kambuh LAGI di call site yang sama,
+      karena **cast `any` pada ARGUMEN tidak mencegah TS meng-resolve
+      overload `$fetch` itu sendiri** — resolusi overload itulah yang mahal,
+      bukan pencocokan argumennya.
+    - **Percobaan 3**: ambil `$fetch` dari `globalThis` sekali di module-scope
+      (`const rawFetch = (globalThis as any).$fetch`) — INI MEMPERBAIKI
+      stack-depth (typecheck lolos!) TAPI **diam-diam merusak SSR**: referensi
+      itu bukan instance `$fetch` yang request-scoped, jadi kehilangan
+      forwarding cookie/context. Akibatnya semua halaman admin yang fetch
+      data server-side (post editor, dll) mengembalikan 404 palsu meskipun
+      API endpoint-nya sendiri benar (dibuktikan dengan curl langsung ke
+      endpoint API — selalu 200). **Baru ketahuan setelah test manual buka
+      halaman editor via curl dengan cookie, BUKAN dari typecheck/lint yang
+      semuanya hijau.** Pelajaran: perbaikan yang bikin `nuxt typecheck`
+      lolos TIDAK otomatis berarti runtime-nya benar — selalu uji SSR
+      sungguhan (curl halaman HTML, bukan cuma endpoint JSON) setiap kali
+      mengubah cara fetch data.
+    - **Fix final (yang sekarang dipakai)**: `apiFetch` pakai
+      `useRequestFetch()` (fetch yang genuinely request-scoped — dokumentasi
+      resmi Nuxt untuk internal API call dari kode SSR, no-op alias ke
+      `$fetch` biasa di client) di-cast ke tipe fungsi polos LEWAT `unknown`
+      SETELAH dipanggil `useRequestFetch()` (bukan argumennya yang di-cast),
+      dipanggil FRESH di dalam function body (bukan di module scope, karena
+      butuh context request Nuxt yang cuma ada per-panggilan). **DAN**
+      `useApiFetch` WAJIB tetap `async function` yang benar-benar
+      `await useAsyncData(...)` di dalam tubuhnya (bukan cuma
+      `return useAsyncData(...)` lalu caller yang `await` hasil WRAPPER kita) —
+      soalnya nilai balik `useAsyncData` itu "awaitable" secara khusus (bikin
+      SSR benar-benar menunggu fetch selesai sebelum render), dan begitu kita
+      bungkus ulang jadi object polos `{data, pending, ...}`, sifat
+      awaitable itu HILANG — `await useApiFetch(...)` bakal langsung resolve
+      di microtask berikutnya dengan `data` masih `null`/default, padahal
+      fetch aslinya baru selesai belakangan (persis bug yang bikin halaman
+      editor 404 palsu di atas). Lihat komentar panjang di
+      `apps/admin/app/utils/api.ts` untuk detail lengkap — **JANGAN diubah
+      tanpa re-test SSR end-to-end (buka halaman `/posts/[id]` via curl
+      dengan cookie session, bukan cuma jalankan typecheck).**
+
 ## Kredensial dev (lokal, dari seed)
 
 - Admin login: **admin@example.com** / **changeme123!**
@@ -465,41 +530,108 @@ fase terakhir. Page CRUD gampang ditambah kapan saja nanti — ikuti pola
 tanpa bagian categories/tags (tipe "page" tidak punya taxonomy), tambah
 picker `parentId` (dropdown page lain) dan input `menuOrder` untuk hierarki.
 
-## Cara lanjut ke Phase 7 (Hook/plugin system + example plugin — FASE TERAKHIR)
+## Ringkasan Phase 7 (selesai — FASE TERAKHIR DARI ROADMAP)
 
-Baca bagian "Phase 7" di plan file
-(`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`). Ringkas:
+`HookBus` (`packages/core/src/hooks/hook-bus.ts`) — `onAction`/`emitAction`/
+`onFilter`/`applyFilter`, `ActionMap` interface berisi 4 hook bawaan
+(`content:beforeSave`, `content:statusChanged`, `content:published`,
+`user:registered`) yang augmentable via `declare module "@selftaught/core/server"`.
+Hook nyata di-emit dari `ContentService.update()`/`transitionStatus()`/
+`publishDueScheduled()` dan `UserService.create()`. `CapabilityRegistry`
+(`packages/core/src/registry/capabilities.ts`) direfactor jadi class dengan
+`.register()`/`.list()` — `CAPABILITIES`/`CapabilityKey` (literal union,
+type-safe) TETAP ADA untuk built-in capabilities, registry cuma nambah jalur
+untuk capability BARU dari plugin (sebagai plain string, tanpa autocomplete —
+tradeoff yang disengaja). `RoleService` dapat 2 method baru:
+`syncCapabilities()` (upsert capability baru ke tabel `capabilities`) dan
+`grantCapabilityToRole()` (dipakai supaya role `admin` selalu lengkap
+walau ada capability baru dari plugin). `definePlugin()`/`createPluginContext()`
+(`packages/core/src/plugins/define-plugin.ts`) — `PluginContext` cuma berisi
+`{hooks, contentTypes, taxonomies, capabilities}`; `blocks` SENGAJA tidak
+dimasukkan (core tidak boleh depend ke `@selftaught/blocks` — plugin yang mau
+register block baru tinggal `import { blockRegistry } from "@selftaught/blocks"`
+langsung di `setup()`-nya, tidak perlu lewat ctx).
 
-1. `packages/core/src/hooks/hook-bus.ts` — `HookBus` class: `onAction`/`emitAction`/
-   `onFilter`/`applyFilter`, tipe-aman lewat `ActionMap` interface yang bisa
-   di-augment via declaration merging (plugin nambah hook baru tanpa ubah core).
-   Emit hook nyata dari titik yang masuk akal: `content:beforeSave`/`content:published`
-   di `ContentService`, `user:registered` di `UserService`, dst.
-2. `plugins.config.ts` di root (daftar plugin aktif) + `definePlugin({ id, setup(ctx) {...} })`
-   helper di core — `ctx.hooks`, `ctx.contentTypes.register()` (pakai
-   `contentTypeRegistry` yang sudah ada), `ctx.blocks.register()` (pakai
-   `blockRegistry` dari `@selftaught/blocks` yang sudah ada), `ctx.capabilities.register()`
-   (pakai `CapabilityRegistry` — CATATAN: capability registry SAAT INI di
-   `packages/core/src/registry/capabilities.ts` masih berbentuk const array
-   `CAPABILITIES`, BUKAN kelas registry seperti `contentTypeRegistry`/
-   `taxonomyRegistry` — perlu direfactor jadi class dengan method `register()`
-   dulu supaya plugin bisa nambah capability baru secara dinamis).
-3. `AdminUIRegistry` di `apps/admin` (BUKAN di core — ini UI-specific):
-   `registerMenuItem({label,icon,to,capability})`, `registerEditorPanel(contentType,component)`.
-4. `server/plugins/00.load-plugins.ts` di `apps/admin` DAN `apps/frontend`
-   (Nitro plugin, load saat boot, baca `plugins.config.ts`, panggil `setup()`
-   tiap plugin terdaftar).
-5. `plugins/example-plugin/` — bukti semua extension point jalan: register 1
-   capability baru, hook `content:published` (misal log ke console), 1 panel
-   editor sidebar yang nulis ke `content_meta` (tabel ini sudah ada sejak
-   Phase 2, belum pernah dipakai — inilah use case pertamanya).
+`ContentMetaService` baru (`packages/core/src/domain/content/content-meta-service.ts`)
+mengaktifkan tabel `content_meta` yang sudah ada sejak Phase 2 tapi belum
+pernah dipakai. `AdminUIRegistry` (`apps/admin/app/utils/admin-ui-registry.ts`,
+BUKAN di core — murni UI) untuk `registerMenuItem`/`registerEditorPanel`.
+Loading plugin dipecah 2 jalur yang disengaja terpisah: `apps/admin/plugins.config.ts`
++ `server/plugins/00.load-plugins.ts` (Nitro, server-side: jalankan `setup()`
+tiap plugin + sync capability ke DB) vs `apps/admin/app/plugins/load-plugins.ts`
+(Nuxt app plugin, Vue-side: daftarkan komponen editor panel plugin ke
+`adminUIRegistry` — dipisah karena komponen Vue cuma masuk akal di context
+Vue app, bukan Nitro server context).
 
-Ini FASE TERAKHIR di roadmap. Setelah ini selesai + di-commit, CMS sudah
-mengimplementasikan semua 8 fase yang direncanakan (Phase 0-7). Item yang
-sengaja ditunda di sepanjang jalan (page CRUD, delete_pages/publish_pages
-capability terpisah, custom error classes buat HTTP status code yang lebih
-presisi — lihat catatan Phase 4) boleh jadi pekerjaan lanjutan di luar
-roadmap awal, dicatat di sini supaya tidak hilang.
+`plugins/example-plugin/` — plugin nyata yang jalan penuh: register capability
+`example_plugin_capability`, hook `content:published` (console.log), panel
+sidebar `EditorPanel.vue` di post editor yang baca/tulis `content_meta` lewat
+`$fetch` polos (BUKAN Nuxt UI components atau `apiFetch`/`useApiFetch` admin —
+plugin pihak ketiga tidak boleh asumsi itu semua tersedia). Subpath export
+`"./editor-panel"` di `package.json` plugin menunjuk ke wrapper `.ts` tipis
+yang re-export `.vue`-nya (BUKAN langsung ke file `.vue`) — lihat komentar di
+`plugins/example-plugin/src/editor-panel.ts` soal kenapa (shim `"*.vue"` cuma
+cocok untuk specifier yang literal berakhir `.vue`, bukan lewat package
+subpath export).
+
+**Bug serius yang ditemukan & diperbaiki di fase ini** (bukan soal plugin,
+tapi soal infrastruktur `apiFetch`/`useApiFetch` dari Phase 4): lihat
+**Gotcha #17** — 3 percobaan berturut-turut untuk fix stack-depth issue
+(Gotcha #13) yang masing-masing lolos typecheck tapi salah satu di antaranya
+diam-diam merusak SSR (halaman editor post 404 palsu walau API-nya benar).
+Baru ketahuan lewat test SSR manual (curl halaman HTML dengan cookie), bukan
+dari typecheck/lint yang semuanya hijau. **Pelajaran penting untuk kerja
+lanjutan**: `nuxt typecheck` lolos ≠ runtime benar untuk kode yang menyentuh
+fetch/data-loading — selalu verifikasi SSR sungguhan.
+
+**Terverifikasi end-to-end via curl, termasuk regresi penuh lintas semua
+fase** (Phase 2-7 sekaligus dalam satu skenario): plugin loader jalan saat
+boot → capability plugin ter-sync ke DB dan otomatis ter-grant ke role admin
+→ login → buat post → assign kategori+tag+media (Phase 3) → submit review →
+update (revisi tersimpan, Phase 4) → publish → SEO custom title ter-resolve
+(Phase 5) → panel plugin ter-render di SSR halaman editor (Phase 7) dan
+content_meta tersimpan/terbaca lewat panel → halaman publik post/category/tag/
+sitemap semua benar (Phase 2/3/5/6) → hook `content:published` ter-log di
+server console. Lint+typecheck bersih di SEMUA package (`core`, `blocks`,
+`example-plugin`, `admin`, `frontend`, `theme-default`).
+
+## Item yang sengaja ditunda (bukan bug/lupa — keputusan scope sepanjang pengerjaan)
+
+Semua 8 fase roadmap SELESAI, tapi beberapa hal secara sadar di-skip demi
+menjaga fase-fase tetap proporsional dalam satu sesi kerja panjang tanpa
+checkpoint approval. Ini bukan "belum sempat" — masing-masing sudah
+dipertimbangkan dan didokumentasikan di titik ia di-skip:
+
+1. **Content type "page" — CRUD admin/API belum ada** (Phase 2 & 6). Cuma
+   terdaftar di `ContentTypeRegistry`. Implementasi: copy persis pola
+   `apps/admin/server/api/posts/*` + `apps/admin/app/pages/posts/*` untuk
+   `/api/pages` + `/pages`, tanpa bagian categories/tags (tipe "page" tidak
+   punya taxonomy di `ContentTypeDefinition`), tambah picker `parentId` +
+   input `menuOrder` untuk hierarki halaman ala WordPress.
+2. **`settings.homepageContentId` (static front page)** — bergantung pada #1,
+   jadi ikut tertunda. Homepage sekarang cuma mode "latest posts".
+3. **Roles & Capabilities admin UI** — RBAC penuh di level DB/service sejak
+   Phase 1, tapi TIDAK ADA halaman admin untuk lihat/assign role atau
+   capability ke user (user baru cuma bisa dibuat lewat `pnpm db:seed` atau
+   psql manual). Perlu: `/users` (list + assign role) dan `/roles` (lihat
+   capability per role, opsional bikin role custom).
+4. **Custom error classes untuk HTTP status code presisi** (dicatat di Phase
+   4) — service layer (`assertCan`, `transitionStatus`, dst.) throw `Error`
+   polos yang jadi HTTP 500 generik lewat h3, bukan 400/403 yang lebih tepat.
+   Fungsional benar (pesan error tetap sampai ke user), cuma kurang REST-precise.
+5. **`delete_pages`/`publish_pages` capability terpisah** — tipe "page" saat
+   ini berbagi satu capability `edit_pages` untuk edit/publish/delete
+   sekaligus (lihat `ContentTypeRegistry` di Phase 2), beda dari "post" yang
+   granular. Cukup untuk sekarang karena UI/API "page" sendiri belum ada (#1).
+6. **Multi-role per user, role custom lewat UI** — schema `user_roles` sudah
+   many-to-many sejak Phase 1, tapi belum ada UI untuk assign lebih dari satu
+   role atau bikin role baru di luar 4 SYSTEM_ROLES bawaan.
+7. **`packages/ui`** — package kosong sejak Phase 0, tidak pernah terpakai.
+   Aman dihapus atau diisi kalau nanti ada komponen Vue yang genuinely
+   dipakai bersama admin+frontend+theme.
+
+Tidak ada satu pun dari ini yang blocking — semuanya extension yang lurus ke
+depan mengikuti pola yang sudah established di codebase.
 
 ## Git
 

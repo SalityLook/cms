@@ -1,6 +1,8 @@
-// Built-in capability keys. Plugins register additional keys later via
-// CapabilityRegistry.register() (Phase 7) — this const list seeds the DB
-// in Phase 1 and gives call sites autocomplete/type-safety today.
+// Built-in capability keys. `CapabilityKey` stays a compile-time literal union
+// (autocomplete/typo-safety at every requireCapability("...") call site) —
+// plugin-added capabilities go through CapabilityRegistry.register() below as
+// plain strings instead, since the compiler can't know about them ahead of
+// time. Both end up in the same DB `capabilities` table either way.
 export const CAPABILITIES = [
   "edit_posts",
   "edit_others_posts",
@@ -15,6 +17,35 @@ export const CAPABILITIES = [
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number];
+
+export interface CapabilityDefinition {
+  key: string;
+  description?: string;
+}
+
+class CapabilityRegistryImpl {
+  private readonly capabilities = new Map<string, CapabilityDefinition>();
+
+  constructor(seed: readonly string[]) {
+    for (const key of seed) {
+      this.capabilities.set(key, { key });
+    }
+  }
+
+  register(definition: CapabilityDefinition) {
+    this.capabilities.set(definition.key, definition);
+  }
+
+  list(): CapabilityDefinition[] {
+    return [...this.capabilities.values()];
+  }
+
+  has(key: string): boolean {
+    return this.capabilities.has(key);
+  }
+}
+
+export const capabilityRegistry = new CapabilityRegistryImpl(CAPABILITIES);
 
 export const SYSTEM_ROLES = {
   admin: {

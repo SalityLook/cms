@@ -17,6 +17,7 @@
     "@nuxt/ui": "^3.0.0",
     "@selftaught/blocks": "workspace:*",
     "@selftaught/core": "workspace:*",
+    "@selftaught/example-plugin": "workspace:*",
     "@selftaught/tailwind-config": "workspace:*",
     "@tiptap/extension-image": "^2.11.2",
     "@tiptap/starter-kit": "^2.11.2",

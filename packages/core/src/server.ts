@@ -9,8 +9,12 @@ export * from "./domain/seo/index";
 export * from "./domain/settings/index";
 export * from "./domain/taxonomy/index";
 export * from "./domain/users/index";
+export * from "./hooks/hook-bus";
+export * from "./plugins/define-plugin";
+export * from "./registry/capabilities";
 
 import { db } from "./db/client";
+import { ContentMetaService } from "./domain/content/content-meta-service";
 import { ContentService } from "./domain/content/content-service";
 import { LocalDiskStorage } from "./domain/media/local-disk-storage";
 import { MediaService } from "./domain/media/media-service";
@@ -27,6 +31,7 @@ export const roleService = new RoleService(db);
 export const permissionService = new PermissionService(roleService, userService);
 export const revisionService = new RevisionService(db);
 export const contentService = new ContentService(db, revisionService);
+export const contentMetaService = new ContentMetaService(db);
 export const taxonomyService = new TaxonomyService(db);
 export const settingsService = new SettingsService(db);
 

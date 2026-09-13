@@ -40,4 +40,21 @@ export class RoleService {
       .where(eq(userRoles.userId, userId));
     return rows.map((row) => row.key);
   }
+
+  /** Idempotently ensures each key exists as a row in `capabilities` — called at plugin-load time so plugin-registered capabilities become assignable. */
+  async syncCapabilities(keys: string[]): Promise<void> {
+    for (const key of keys) {
+      await this.db.insert(capabilities).values({ key }).onConflictDoNothing();
+    }
+  }
+
+  /** Grants a capability to a role if both exist. Used to keep the "admin" role complete as plugins add capabilities. */
+  async grantCapabilityToRole(roleKey: string, capabilityKey: string): Promise<void> {
+    const role = await this.getRoleByKey(roleKey);
+    const capability = await this.db.query.capabilities.findFirst({ where: eq(capabilities.key, capabilityKey) });
+    if (!role || !capability) {
+      return;
+    }
+    await this.db.insert(roleCapabilities).values({ roleId: role.id, capabilityId: capability.id }).onConflictDoNothing();
+  }
 }

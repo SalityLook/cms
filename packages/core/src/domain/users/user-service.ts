@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../../auth/password";
 import type { Database } from "../../db/client";
 import { users } from "../../db/schema/users";
+import { hooks } from "../../hooks/hook-bus";
 
 export interface CreateUserInput {
   email: string;
@@ -18,6 +19,9 @@ export class UserService {
       .insert(users)
       .values({ email: input.email.toLowerCase(), passwordHash, displayName: input.displayName })
       .returning();
+    if (user) {
+      await hooks.emitAction("user:registered", { userId: user.id, email: user.email });
+    }
     return user;
   }
 

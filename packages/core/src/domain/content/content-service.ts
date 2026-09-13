@@ -2,6 +2,7 @@ import { and, count as countRows, desc, eq, lte } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { content } from "../../db/schema/content";
 import type { RevisionService } from "../../domain/revisions/revision-service";
+import { hooks } from "../../hooks/hook-bus";
 import type { CapabilityKey } from "../../registry/capabilities";
 import { type ContentTypeDefinition, contentTypeRegistry } from "../../registry/content-types";
 import type { ContentDocument } from "../../shared/content-doc";
@@ -81,6 +82,11 @@ export class ContentService {
     this.assertOwnershipOrCapability(actor, existing, definition);
 
     await this.snapshotCurrent(actor, existing);
+    await hooks.emitAction("content:beforeSave", {
+      contentId: existing.id,
+      type: existing.type,
+      title: input.title ?? existing.title
+    });
 
     const [row] = await this.db
       .update(content)
@@ -127,6 +133,19 @@ export class ContentService {
     if (!row) {
       throw new Error("Failed to transition content status");
     }
+
+    await hooks.emitAction("content:statusChanged", {
+      contentId: row.id,
+      type: row.type,
+      from: existing.status,
+      to: next
+    });
+    if (next === "published") {
+      await hooks.emitAction("content:published", {
+        content: { id: row.id, type: row.type, slug: row.slug, title: row.title }
+      });
+    }
+
     return row;
   }
 
@@ -169,6 +188,9 @@ export class ContentService {
         .returning();
       if (row) {
         published.push(row);
+        await hooks.emitAction("content:published", {
+          content: { id: row.id, type: row.type, slug: row.slug, title: row.title }
+        });
       }
     }
     return published;
