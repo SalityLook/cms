@@ -19,6 +19,10 @@ ProseMirror, TypeScript end-to-end).
   post, tipografi serif untuk judul) — semua dibangun di atas font
   self-hosted (Inter/Lora) dan satu design token bersama
   (`packages/tailwind-config`)
+- **Branding per-instalasi** — ganti logo, favicon, dan nama situs sendiri
+  lewat `/settings` (Site Identity), tanpa sentuh kode — "SelfTaught" cuma
+  identitas bawaan proyek ini, sama seperti WordPress; cocok dipakai
+  masing-masing sekolah/organisasi dengan identitas sendiri per instalasi
 - **Content management** — post & **page** (dengan hierarki parent/menu
   order) pakai block editor bergaya Gutenberg (Tiptap),
   draft/pending review/scheduled/published/trashed dengan auto-publish via

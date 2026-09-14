@@ -15,11 +15,12 @@ gotcha yang sudah ditemukan, supaya pekerjaan bisa lanjut tanpa internet dan
 tanpa perlu re-derive keputusan yang sudah diambil.
 
 **STATUS: semua 8 fase (Phase 0-7) dari roadmap awal sudah selesai dan
-ter-commit, ditambah 8 putaran pasca-roadmap** (Users & Roles admin UI,
+ter-commit, ditambah 9 putaran pasca-roadmap** (Users & Roles admin UI,
 automated tests, CRUD content type "page", production hardening,
 **deployment produksi live**, **UI/UX redesign penuh**, **brand logo/warna
-asli**, dan **fix Tailwind CSS tidak ter-compile di situs publik** — lihat
-"Pekerjaan pasca-roadmap #1-8" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
+asli**, **fix Tailwind CSS tidak ter-compile di situs publik**, dan
+**branding per-instance (logo/favicon/nama situs bisa diganti admin)** —
+lihat "Pekerjaan pasca-roadmap #1-9" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
 block editor, taxonomies, media library, revisions, publishing workflow
 penuh (draft/pending/scheduled/published/trashed + cron auto-publish), SEO
 subsystem, theme layer yang swappable, hook/plugin system dengan contoh
@@ -459,6 +460,25 @@ pnpm --filter @selftaught/core db:seed
     Unterminated string`) menunjuk ke comment yang salah, BUKAN ke
     directive-nya. Hindari apostrof di comment `.css` kalau file itu juga
     punya `@source`.
+
+22. **`SettingsService.set(key, null)` (dan pola serupa manapun yang nyimpan
+    JS `null` ke kolom `jsonb`) 500 kalau kolomnya `.notNull()`** — drizzle-orm
+    `PgJsonb.mapToDriverValue()` (yang seharusnya `JSON.stringify(value)`,
+    jadi `null` → string `"null"`, valid jsonb non-NULL) TERNYATA DI-SKIP
+    kalau value-nya literal JS `null` — drizzle malah kirim SQL NULL mentah,
+    yang ditolak constraint `NOT NULL`. Ini bikin SEMUA fitur "klik untuk
+    deselect" yang nyimpan balik `null` ke `settings` (OG image default,
+    dan sekarang logo/favicon) gagal 500 kalau kolomnya `.notNull()`.
+    **Fix yang dipakai**: `packages/core/src/db/schema/settings.ts` kolom
+    `value` dibuat nullable (migration `0005_wealthy_rocket_racer.sql`,
+    cuma `ALTER COLUMN value DROP NOT NULL`) — representasikan "tidak ada
+    value" sebagai SQL NULL sungguhan, bukan coba akalin di service layer.
+    `content_meta.value` sudah nullable dari awal (aman). `content.content`/
+    `revisions.content` tetap `.notNull()` (benar, tidak pernah dipanggil
+    dengan `null` di praktiknya — selalu snapshot object asli). **Kalau
+    nambah kolom `jsonb` baru yang service-nya mungkin perlu nyimpen
+    "clear"/null, JANGAN pakai `.notNull()`** kecuali yakin value-nya tidak
+    pernah kosong.
 
 ## Kredensial dev (lokal, dari seed)
 
@@ -1205,6 +1225,53 @@ sebelum/sesudah fix (`bg-white`/`bg-brand-600`/`text-brand-600`/
 `rounded-full`: 0 match → 1 match masing-masing), ukuran bundle CSS naik
 34KB→67KB. Typecheck+lint+`pnpm test` (29/29) tetap bersih. Deploy via
 `pm2 restart selftaught-frontend`.
+
+## Pekerjaan pasca-roadmap #9: Branding per-instance (logo/favicon/nama situs)
+
+User tanya apakah logo/favicon bisa diganti, karena CMS ini akan dipakai
+beberapa sekolah — "SelfTaught" cuma branding proyek ini sendiri, sama
+seperti WordPress punya identitas default yang tiap situs nyata ganti.
+Sebelumnya TIDAK BISA — logo hardcoded sebagai file statis di `<img>`,
+tanpa kontrol dari admin.
+
+- `GET /api/branding` baru di KEDUA app (admin + frontend, proses Nitro
+  terpisah, DB sama) — SENGAJA tanpa auth (dibutuhkan halaman login yang
+  belum ada session, dan tiap render halaman publik). Baca setting baru
+  `siteLogoMediaId`/`siteFaviconMediaId` (tidak butuh migration — `settings`
+  memang generic key/value jsonb sejak awal), resolve ke URL lewat
+  `mediaService`, fallback `null` kalau belum diset.
+- `BrandLogo.vue` (1 salinan per app, sama pola dengan aset statis
+  sebelumnya) — render logo custom kalau ada, fallback ke
+  `/brand/wordmark.png` bawaan. Menggantikan SEMUA `<img>` hardcoded
+  (sidebar admin, mobile nav admin, login×2, header theme, error page
+  theme).
+- Favicon dinamis: `app.vue` kedua app fetch branding sekali,
+  `useHead()` set `<link rel="icon">` ke favicon custom kalau ada — PNG
+  polos langsung dipakai (`type="image/png"`), tidak perlu proses
+  multi-size `.ico` seperti aset default SelfTaught (lihat Pekerjaan #7).
+- Settings admin (`/settings`): card baru "Site Identity" — picker Logo +
+  picker Favicon (pola sama seperti picker OG image yang sudah ada).
+  Teks copyright halaman login sekarang baca nama situs juga, bukan
+  hardcoded "SelfTaught CMS".
+
+**Bug nyata ketemu sekaligus diperbaiki saat testing "hapus logo"**: lihat
+**Gotcha #22** — `SettingsService.set(key, null)` 500 karena kolom
+`settings.value` `.notNull()` bentrok sama cara drizzle-orm handle jsonb
+`null`. Ini artinya picker "default OG image" yang SUDAH ADA sejak Phase 5
+sebenarnya TIDAK PERNAH bisa di-deselect sejak awal dibangun — baru
+ketahuan sekarang karena baru sekarang jalur "pilih → simpan → deselect →
+simpan lagi" benar-benar dites end-to-end. Di-fix di level schema
+(migration `0005`, `settings.value` jadi nullable), bukan di-workaround di
+service layer.
+
+**Diverifikasi end-to-end** (dev server, bukan port produksi): login →
+upload media asli → set sebagai logo DAN favicon lewat
+`PATCH /api/settings` → konfirmasi `GET /api/branding` DAN HTML hasil
+render di KEDUA app berubah pakai logo baru → konfirmasi reset ke `null`
+sekarang 200 (sebelumnya 500) dan beneran ke-clear di DB → cleanup media
+test + reset settings. Typecheck+lint bersih, `pnpm test` 29/29, migration
+diterapkan ke database yang sama dipakai produksi (dev dan prod di VPS ini
+satu Postgres yang sama). Build ulang + `pm2 restart` — dikonfirmasi live.
 
 ## Git
 
