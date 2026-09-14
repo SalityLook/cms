@@ -15,10 +15,10 @@ gotcha yang sudah ditemukan, supaya pekerjaan bisa lanjut tanpa internet dan
 tanpa perlu re-derive keputusan yang sudah diambil.
 
 **STATUS: semua 8 fase (Phase 0-7) dari roadmap awal sudah selesai dan
-ter-commit, ditambah 5 putaran pasca-roadmap** (Users & Roles admin UI,
-automated tests, CRUD content type "page", production hardening, dan
-**deployment produksi live** — lihat "Pekerjaan pasca-roadmap #1-5" di
-bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
+ter-commit, ditambah 6 putaran pasca-roadmap** (Users & Roles admin UI,
+automated tests, CRUD content type "page", production hardening,
+**deployment produksi live**, dan **UI/UX redesign penuh** — lihat
+"Pekerjaan pasca-roadmap #1-6" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
 block editor, taxonomies, media library, revisions, publishing workflow
 penuh (draft/pending/scheduled/published/trashed + cron auto-publish), SEO
 subsystem, theme layer yang swappable, hook/plugin system dengan contoh
@@ -1032,6 +1032,86 @@ selftaught-admin selftaught-frontend`. Bukan darurat (Postgres cuma listen
 `127.0.0.1`, tidak diekspos publik) tapi tetap defense-in-depth yang
 penting di VPS bersama seperti ini — kalau sesi Claude Code berikutnya
 lihat `DATABASE_URL` masih `postgres:postgres@...`, ingatkan user lagi.
+
+## Pekerjaan pasca-roadmap #6: UI/UX redesign (selesai)
+
+Sebelum ini, admin tidak punya shared layout sama sekali — tiap halaman
+bikin `<header>`+wrapper sendiri-sendiri (tidak konsisten, tanpa nav mobile
+sama sekali), dan theme publik cuma daftar link polos tanpa styling. Ini
+murni perubahan visual/struktur — **tidak ada logic data-fetching atau
+action yang diubah**, semua `useApiFetch`/`apiFetch`/endpoint call tetap
+persis sama.
+
+- **Design tokens** (`packages/tailwind-config/theme.css`): brand color
+  diperluas dari 3 stop ke full scale oklch 50-950 (hue sama, ~260,
+  indigo-violet), tambah token `--font-serif` (Lora) untuk heading
+  editorial. `@nuxt/fonts` dipasang di admin (Inter) dan theme (Inter +
+  Lora) — **diverifikasi font di-self-host** (file `.woff2` sungguhan ada
+  di `.output/public/_fonts/` hasil build produksi, BUKAN proxy runtime ke
+  Google Fonts). `@tailwindcss/typography` dipasang di admin DAN theme —
+  sebelumnya class `prose` sudah dipakai di `BlockEditor.vue` dan halaman
+  artikel theme tapi TIDAK PERNAH benar-benar berefek karena plugin-nya
+  belum terpasang (silent no-op, bukan error).
+- **Admin**: `layouts/default.vue` baru (sidebar responsif — fixed di
+  desktop, `USlideover` drawer di mobile — dengan nav dikelompokkan
+  Konten/Kelola, user menu+logout dipindah ke sini dari dashboard supaya
+  ada di semua halaman). `app.vue` bungkus `NuxtPage` dengan `NuxtLayout`;
+  `login.vue` opt-out via `layout: false`, dapat desain split-screen
+  branded sendiri. Komponen baru `PageHeader.vue` (title+description+
+  actions slot) menggantikan markup `<header>` yang dulu diduplikasi di
+  tiap halaman. Dashboard (`index.vue`) dirombak jadi stat card (posts/
+  pages/media/draft) + recent posts, bukan daftar link statis. Semua
+  halaman list (posts/pages/media/users/trash/categories/tags/roles)
+  di-restyle konsisten (table/card, empty state dengan icon). Halaman
+  editor (`posts/[id]`, `pages/[id]`, `*/new`) dirombak jadi 2-kolom
+  (editor utama + sidebar meta) ala WordPress/Ghost. `BlockEditor.vue`
+  dapat **toolbar formatting sungguhan** (bold/italic/strike/code, H2/H3,
+  list, quote, code block, insert gambar via URL prompt, horizontal rule,
+  undo/redo) — sebelumnya TIDAK ADA toolbar visible sama sekali, cuma
+  ProseMirror mentah yang mengandalkan markdown shortcut.
+- **Theme publik** (`themes/default`): `layouts/default.vue` baru (header
+  sticky + nav + mobile menu pakai inline SVG polos, BUKAN icon package —
+  theme sengaja tetap "Tailwind polos" sesuai keputusan arsitektur #6,
+  tidak boleh terkunci ke Nuxt UI) + footer. Komponen baru `PostCard.vue`
+  (featured image, badge kategori, judul serif, excerpt, tanggal) dipakai
+  bersama oleh homepage, `/blog`, dan archive kategori/tag. Homepage
+  dirombak jadi hero section + grid post terbaru (sebelumnya cuma `<h1>`
+  + `<ul>` link polos). `blog/[slug].vue`/`[slug].vue` dirombak jadi
+  article layout proper (header center, featured image full-width, body
+  `prose-lg`, tag chip di bawah). `error.vue` di-restyle sesuai brand.
+- **Perubahan backend yang diperlukan untuk PostCard**: endpoint listing
+  (`GET /api/posts`, `/api/category/[slug]`, `/api/tag/[slug]` di
+  `apps/frontend`) sebelumnya cuma balikin raw row `content` — punya
+  `featuredMediaId` (BUKAN URL, lihat Gotcha #12) tapi TIDAK ada data
+  terms. `apps/frontend/server/utils/enrich-posts.ts` baru (dipakai
+  ketiga endpoint itu) batch-resolve `featuredMediaUrl` + `categories`
+  per post via `Promise.all` — cukup untuk skala saat ini (page size
+  kecil), butuh query batch sungguhan kalau jumlah post membesar jauh.
+
+**Insiden kecil selama verifikasi** (tidak ada kerusakan permanen, dicatat
+supaya tidak terulang): `fuser -k 3000/tcp` yang dimaksudkan untuk
+membersihkan dev server ternyata mematikan proses **pm2 produksi**
+`selftaught-admin` yang sungguhan jalan di port itu — pm2 auto-restart
+memulihkannya dalam hitungan detik (downtime beberapa detik, tidak ada
+kehilangan data). **Pelajaran**: karena VPS ini production bersama (lihat
+peringatan ⚠️ di paling atas dokumen), SELALU cek `pm2 status`/
+`ss -tlnp` dulu sebelum menyentuh port berapa pun — jangan asumsikan port
+3000/3001 "pasti kosong" untuk testing lokal. Testing dev berikutnya
+dijalankan tanpa mematikan apa pun — `nuxt dev` otomatis pindah ke port
+alternatif (3002/3003) kalau port default terpakai, itu perilaku Nuxt yang
+aman, tidak perlu dibantu `fuser -k`.
+
+**Diverifikasi runtime, bukan cuma typecheck** (disiplin Gotcha #17): login
+ke API admin sungguhan di port dev terpisah dari produksi, SSR-test semua
+halaman yang ditulis ulang (dashboard, semua list, semua form `/new`, dan
+editor dinamis `posts/[id]`/`pages/[id]`/`users/[id]`) pakai cookie session
+asli, bikin post published sungguhan dengan kategori dan featured-image
+fallback state, konfirmasi tampil benar di homepage/archive
+kategori/halaman post penuh (block content ter-render benar), lalu
+cleanup total. `pnpm test` tetap 29/29. Kedua app di-build ulang untuk
+produksi dan di-deploy via `pm2 restart` — dikonfirmasi live di
+`https://self-taught.my.id`/`https://admin.self-taught.my.id`, dan site
+lain di VPS ini tidak terganggu.
 
 ## Git
 

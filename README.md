@@ -13,6 +13,12 @@ ProseMirror, TypeScript end-to-end).
 
 ## Fitur
 
+- **UI modern & responsif** — admin dashboard dengan sidebar navigasi
+  (desktop) / drawer (mobile), block editor dengan toolbar formatting
+  penuh, dan situs publik dengan tampilan blog editorial (hero, kartu
+  post, tipografi serif untuk judul) — semua dibangun di atas font
+  self-hosted (Inter/Lora) dan satu design token bersama
+  (`packages/tailwind-config`)
 - **Content management** — post & **page** (dengan hierarki parent/menu
   order) pakai block editor bergaya Gutenberg (Tiptap),
   draft/pending review/scheduled/published/trashed dengan auto-publish via
