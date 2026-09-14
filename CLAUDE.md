@@ -15,10 +15,11 @@ gotcha yang sudah ditemukan, supaya pekerjaan bisa lanjut tanpa internet dan
 tanpa perlu re-derive keputusan yang sudah diambil.
 
 **STATUS: semua 8 fase (Phase 0-7) dari roadmap awal sudah selesai dan
-ter-commit, ditambah 7 putaran pasca-roadmap** (Users & Roles admin UI,
+ter-commit, ditambah 8 putaran pasca-roadmap** (Users & Roles admin UI,
 automated tests, CRUD content type "page", production hardening,
-**deployment produksi live**, **UI/UX redesign penuh**, dan **brand
-logo/warna asli** — lihat "Pekerjaan pasca-roadmap #1-7" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
+**deployment produksi live**, **UI/UX redesign penuh**, **brand logo/warna
+asli**, dan **fix Tailwind CSS tidak ter-compile di situs publik** — lihat
+"Pekerjaan pasca-roadmap #1-8" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
 block editor, taxonomies, media library, revisions, publishing workflow
 penuh (draft/pending/scheduled/published/trashed + cron auto-publish), SEO
 subsystem, theme layer yang swappable, hook/plugin system dengan contoh
@@ -432,6 +433,32 @@ pnpm --filter @selftaught/core db:seed
     manusia yang menjalankannya langsung. Kalau ketemu ini lagi: siapkan
     perintah SQL-nya, minta USER yang menjalankan sendiri via `! <command>`
     di sesi mereka — jangan coba cari cara memutar classifier-nya.
+
+21. **PENTING — `themes/default` (Nuxt Layer) butuh `@source` eksplisit di
+    CSS-nya, TANPA itu situs publik render TANPA STYLING SAMA SEKALI**
+    (bukan cuma warna brand — HAMPIR SEMUA utility class Tailwind). Root
+    cause: Tailwind v4 auto-detect content scan berhenti di boundary
+    `package.json` pertama yang ditemukan saat scan ke luar dari lokasi
+    file CSS; `themes/default` PUNYA `package.json` sendiri (Gotcha #15),
+    jadi Tailwind v4 tidak pernah scan ke dalam `themes/default/app/**/*.vue`
+    walau Nuxt/Vite build file itu ke `apps/frontend` dengan normal.
+    `apps/admin` TIDAK kena ini (bukan Layer, tidak ada boundary
+    `package.json` tambahan). **Cara ketahuan**: HTML hasil SSR terlihat
+    BENAR (semua `class="..."` ada di markup) — jangan percaya itu sebagai
+    bukti CSS jalan. WAJIB cek byte CSS hasil compile langsung
+    (`grep -c "bg-white" .output/public/_nuxt/entry.*.css` harus > 0, bukan
+    cuma cek HTML). **Fix**: tambahkan
+    `@source "../../";` (path relatif ke lokasi file CSS, arahkan ke folder
+    `app/` milik layer) di `themes/default/app/assets/css/main.css`. Kalau
+    bikin theme baru yang juga Nuxt Layer dengan `package.json` sendiri,
+    ulangi pola `@source` ini atau situsnya akan putih polos lagi.
+    **Jebakan tambahan**: Tailwind 4.3.3 (versi yang dipakai project ini)
+    punya lexer sendiri yang salah-parse tanda petik apostrof (`'`) di MANA
+    PUN dalam file CSS yang sama sebagai "unterminated string" begitu ada
+    directive `@source` di file itu — pesan errornya (`CssSyntaxError:
+    Unterminated string`) menunjuk ke comment yang salah, BUKAN ke
+    directive-nya. Hindari apostrof di comment `.css` kalau file itu juga
+    punya `@source`.
 
 ## Kredensial dev (lokal, dari seed)
 
@@ -1151,6 +1178,33 @@ Pekerjaan #6) balikin `/brand/wordmark.png`+`/favicon.ico` 200, HTML hasil
 SSR benar-benar memuat tag `<img>` baru + teks tagline asli. `pnpm test`
 tetap 29/29. Build ulang + `pm2 restart` — dikonfirmasi live di kedua
 domain produksi.
+
+## Pekerjaan pasca-roadmap #8: Fix situs publik render tanpa styling (selesai)
+
+User lapor `/blog` "masih putih polos, css tailwind sepertinya belum
+terimplementasi" — laporan itu BENAR. Root cause dan fix lengkap ada di
+**Gotcha #21** di atas: `themes/default` sebagai Nuxt Layer bikin Tailwind
+v4 auto-content-detection berhenti di boundary `package.json` layer itu
+dan tidak pernah scan `.vue` file di dalamnya, jadi HAMPIR SEMUA utility
+class (bukan cuma warna brand) gagal ter-generate sejak commit UI redesign
+(Pekerjaan #6) — bug sudah ada dari situ, baru ketahuan sekarang.
+
+**Pelajaran penting soal disiplin verifikasi**: sepanjang Pekerjaan #6/#7
+saya SSR-test banyak halaman dan selalu cek markup HTML (class ada di
+`<div class="bg-white ...">`) sebagai "bukti" styling benar — itu TIDAK
+CUKUP, karena HTML tetap punya nama class yang benar walau CSS-nya kosong
+(browser cuma mengabaikan class yang tidak match rule apa pun). Verifikasi
+yang benar-benar valid untuk masalah CSS harus cek BYTE hasil compile
+(`grep -c "bg-white" .output/public/_nuxt/entry.*.css`), bukan cuma
+struktur HTML. Ini pelajaran yang sama semangatnya dengan Gotcha #17
+("nuxt typecheck lolos ≠ runtime benar") — sekarang berlaku juga untuk
+"HTML markup benar ≠ CSS ter-compile benar".
+
+**Diverifikasi**: `grep` byte CSS lokal DAN di HTTPS produksi
+sebelum/sesudah fix (`bg-white`/`bg-brand-600`/`text-brand-600`/
+`rounded-full`: 0 match → 1 match masing-masing), ukuran bundle CSS naik
+34KB→67KB. Typecheck+lint+`pnpm test` (29/29) tetap bersih. Deploy via
+`pm2 restart selftaught-frontend`.
 
 ## Git
 
