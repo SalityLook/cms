@@ -5,7 +5,7 @@ const bodySchema = z.object({
   scheduledAt: z.string().datetime({ offset: true }).or(z.string().min(1))
 });
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   const actor = requireCapability(event, "edit_pages");
   const id = getRouterParam(event, "id");
   if (!id) {

@@ -9,6 +9,7 @@ export * from "./domain/seo/index";
 export * from "./domain/settings/index";
 export * from "./domain/taxonomy/index";
 export * from "./domain/users/index";
+export * from "./errors";
 export * from "./hooks/hook-bus";
 export * from "./plugins/define-plugin";
 export * from "./registry/capabilities";

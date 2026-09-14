@@ -11,7 +11,7 @@ const bodySchema = z.object({
   menuOrder: z.number().int().optional()
 });
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   const actor = requireCapability(event, "edit_pages");
   const body = await readValidatedBody(event, bodySchema.parse);
   return contentService.create(actor, { type: "page", ...body });

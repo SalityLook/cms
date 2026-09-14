@@ -1,6 +1,6 @@
 import { contentService } from "@selftaught/core/server";
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   const actor = requireCapability(event, "edit_posts");
   const id = getRouterParam(event, "id");
   const revisionId = getRouterParam(event, "revisionId");

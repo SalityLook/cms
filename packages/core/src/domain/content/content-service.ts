@@ -2,6 +2,7 @@ import { and, count as countRows, desc, eq, lte } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { content } from "../../db/schema/content";
 import type { RevisionService } from "../../domain/revisions/revision-service";
+import { CapabilityError, NotFoundError, TransitionError, ValidationError } from "../../errors";
 import { hooks } from "../../hooks/hook-bus";
 import type { CapabilityKey } from "../../registry/capabilities";
 import { type ContentTypeDefinition, contentTypeRegistry } from "../../registry/content-types";
@@ -116,7 +117,7 @@ export class ContentService {
     const definition = this.requireContentType(existing.type);
 
     if (!ALLOWED_TRANSITIONS[existing.status].includes(next)) {
-      throw new Error(`Cannot transition content from ${existing.status} to ${next}`);
+      throw new TransitionError(`Cannot transition content from ${existing.status} to ${next}`);
     }
 
     if (next === "published" || next === "scheduled") {
@@ -209,7 +210,7 @@ export class ContentService {
 
     const revision = await this.revisions.getById(revisionId);
     if (!revision || revision.contentId !== id) {
-      throw new Error("Revision not found");
+      throw new NotFoundError("Revision not found");
     }
 
     await this.snapshotCurrent(actor, existing);
@@ -288,7 +289,7 @@ export class ContentService {
   private requireContentType(typeKey: string): ContentTypeDefinition {
     const definition = contentTypeRegistry.get(typeKey);
     if (!definition) {
-      throw new Error(`Unknown content type: ${typeKey}`);
+      throw new ValidationError(`Unknown content type: ${typeKey}`);
     }
     return definition;
   }
@@ -296,14 +297,14 @@ export class ContentService {
   private async requireExisting(id: string): Promise<ContentRow> {
     const existing = await this.getById(id);
     if (!existing) {
-      throw new Error("Content not found");
+      throw new NotFoundError("Content not found");
     }
     return existing;
   }
 
   private assertCan(actor: Actor, capability: CapabilityKey) {
     if (!actor.capabilities.includes(capability)) {
-      throw new Error(`Actor lacks capability: ${capability}`);
+      throw new CapabilityError(`Actor lacks capability: ${capability}`);
     }
   }
 

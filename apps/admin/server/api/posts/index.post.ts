@@ -9,7 +9,7 @@ const bodySchema = z.object({
   content: contentDocumentSchema
 });
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   const actor = requireCapability(event, "edit_posts");
   const body = await readValidatedBody(event, bodySchema.parse);
   return contentService.create(actor, { type: "post", ...body });

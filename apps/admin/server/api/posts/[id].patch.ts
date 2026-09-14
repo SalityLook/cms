@@ -11,7 +11,7 @@ const bodySchema = z.object({
   termIds: z.array(z.string().uuid()).optional()
 });
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   const actor = requireCapability(event, "edit_posts");
   const id = getRouterParam(event, "id");
   if (!id) {
