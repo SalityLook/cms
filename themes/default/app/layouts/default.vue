@@ -20,7 +20,7 @@ const navLinks = [
     <header class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         <NuxtLink to="/" class="flex items-center">
-          <img src="/brand/wordmark.png" alt="SelfTaught" class="h-6 w-auto">
+          <BrandLogo />
         </NuxtLink>
 
         <nav class="hidden sm:flex items-center gap-8">

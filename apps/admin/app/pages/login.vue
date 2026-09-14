@@ -6,6 +6,7 @@ const password = ref("");
 const error = ref("");
 const loading = ref(false);
 const { fetch: refreshSession } = useUserSession();
+const { data: branding } = await useApiFetch<{ siteName: string }>("/api/branding");
 
 async function onSubmit() {
   error.value = "";
@@ -38,7 +39,7 @@ async function onSubmit() {
         class="pointer-events-none absolute bottom-0 left-0 size-80 rounded-full bg-brand-400/10 blur-3xl"
       />
       <div class="relative">
-        <img src="/brand/wordmark.png" alt="SelfTaught" class="h-7 w-auto">
+        <BrandLogo img-class="h-7 w-auto" />
       </div>
       <div class="relative max-w-sm">
         <p class="text-3xl font-serif font-semibold leading-snug">Teachers are everywhere.</p>
@@ -46,14 +47,14 @@ async function onSubmit() {
           Publikasikan konten dengan percaya diri — dibangun untuk kecepatan, kejelasan, dan kontrol penuh.
         </p>
       </div>
-      <p class="relative text-sm text-brand-200">© {{ new Date().getFullYear() }} SelfTaught CMS</p>
+      <p class="relative text-sm text-brand-200">© {{ new Date().getFullYear() }} {{ branding?.siteName ?? "SelfTaught" }}</p>
     </div>
 
     <!-- Form side -->
     <div class="flex items-center justify-center p-6 sm:p-10">
       <div class="w-full max-w-sm">
         <div class="mb-8 lg:hidden">
-          <img src="/brand/wordmark.png" alt="SelfTaught" class="h-7 w-auto">
+          <BrandLogo img-class="h-7 w-auto" />
         </div>
 
         <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Selamat datang kembali</h1>

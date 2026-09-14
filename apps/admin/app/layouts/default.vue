@@ -55,7 +55,7 @@ const initials = computed(() => {
       class="hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:w-64 lg:border-r lg:border-slate-200 dark:lg:border-slate-800 bg-white dark:bg-slate-900"
     >
       <div class="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800">
-        <img src="/brand/wordmark.png" alt="SelfTaught" class="h-6 w-auto">
+        <BrandLogo />
       </div>
 
       <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
@@ -124,7 +124,7 @@ const initials = computed(() => {
     <USlideover v-model:open="mobileNavOpen" side="left" :ui="{ content: 'w-72' }">
       <template #content>
         <div class="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800">
-          <img src="/brand/wordmark.png" alt="SelfTaught" class="h-6 w-auto">
+          <BrandLogo />
         </div>
         <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
           <div class="space-y-0.5">
