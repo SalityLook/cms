@@ -1,6 +1,6 @@
 import { mediaService } from "@selftaught/core/server";
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   requireCapability(event, "manage_media");
   const id = getRouterParam(event, "id");
   if (!id) {

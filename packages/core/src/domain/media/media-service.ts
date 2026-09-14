@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import sharp from "sharp";
 import type { Database } from "../../db/client";
 import { media } from "../../db/schema/media";
+import { NotFoundError, ValidationError } from "../../errors";
 import type { StorageAdapter } from "./storage-adapter";
 
 export interface UploadMediaInput {
@@ -13,6 +14,22 @@ export interface UploadMediaInput {
   altText?: string;
 }
 
+/**
+ * Intentionally conservative allowlist rather than a denylist — new file
+ * types have to be added deliberately. Covers what the block editor and
+ * featured-image/OG-image pickers actually need; nothing executable.
+ */
+const ALLOWED_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "application/pdf"
+]);
+
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MiB
+
 export class MediaService {
   constructor(
     private readonly db: Database,
@@ -20,18 +37,28 @@ export class MediaService {
   ) {}
 
   async upload(input: UploadMediaInput) {
+    if (!ALLOWED_MIME_TYPES.has(input.mimeType)) {
+      throw new ValidationError(`Unsupported file type: ${input.mimeType}`);
+    }
+    if (input.data.byteLength > MAX_FILE_SIZE_BYTES) {
+      throw new ValidationError(`File too large (max ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB)`);
+    }
+    if (input.data.byteLength === 0) {
+      throw new ValidationError("Uploaded file is empty");
+    }
+
     const extension = input.fileName.includes(".") ? input.fileName.split(".").pop() : undefined;
     const key = extension ? `${randomUUID()}.${extension}` : randomUUID();
 
     let width: number | undefined;
     let height: number | undefined;
-    if (input.mimeType.startsWith("image/")) {
+    if (input.mimeType.startsWith("image/") && input.mimeType !== "image/svg+xml") {
       try {
         const meta = await sharp(input.data).metadata();
         width = meta.width;
         height = meta.height;
       } catch {
-        // Not a decodable raster image (e.g. some SVGs) — dimensions stay unset.
+        // Not a decodable raster image — dimensions stay unset.
       }
     }
 
@@ -75,7 +102,7 @@ export class MediaService {
   async delete(id: string) {
     const existing = await this.getById(id);
     if (!existing) {
-      throw new Error("Media not found");
+      throw new NotFoundError("Media not found");
     }
     await this.storage.delete(existing.path);
     await this.db.delete(media).where(eq(media.id, id));
