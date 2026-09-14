@@ -2,6 +2,20 @@
 @import "@selftaught/tailwind-config/theme.css";
 @plugin "@tailwindcss/typography";
 
+/* Tailwind v4 automatic content detection scans outward from the location
+   of this file, but this file lives inside a Nuxt Layer (themes/default)
+   that has its own package.json (see CLAUDE.md Gotcha #15) -- Tailwind
+   treats that as a package boundary and stops there, so it never sees the
+   layer .vue files even though Vite/Nuxt happily builds them into the
+   consuming app (apps/frontend). Without this, almost no utility classes
+   used in themes/default/app were generated (only raw CSS custom
+   properties plus typography-plugin base styles survived) -- the site
+   rendered completely unstyled. Explicit @source fixes it by telling
+   Tailwind to scan the layer app/ directory regardless of that boundary.
+   Note: avoid apostrophes in this comment block -- Tailwind 4.3.3 own
+   lexer mis-parses them as unterminated strings once @source is used. */
+@source "../../";
+
 /* Editorial article typography (used with `class="prose"` around
    BlockRenderer output) — brand-tinted links/quotes, serif headings,
    comfortable measure. Tailwind's `prose` targets plain HTML tags, which is
