@@ -1273,6 +1273,50 @@ test + reset settings. Typecheck+lint bersih, `pnpm test` 29/29, migration
 diterapkan ke database yang sama dipakai produksi (dev dan prod di VPS ini
 satu Postgres yang sama). Build ulang + `pm2 restart` — dikonfirmasi live.
 
+## Rencana kesetaraan fitur WordPress (Pekerjaan pasca-roadmap #10-24)
+
+User minta analisis fitur WordPress yang belum dimiliki CMS ini, lalu minta
+rencana untuk menutup gap itu SEMUA native di core (tanpa plugin eksternal)
+— CMS ini diposisikan sebagai platform yang di-install per VPS/hosting
+(bukan SaaS multi-tenant), modern/ringan/powerful. Rencana lengkap 15 fase
+(Phase 10-24) ada di `/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`
+bagian "Rencana lanjutan: Kesetaraan fitur WordPress tanpa plugin eksternal"
+— WAJIB dibaca sebelum lanjut ke fase mana pun, berisi keputusan arsitektur
+yang sudah dikonfirmasi user (reusable blocks pakai model SYNCED bukan
+detached-copy, self-registration dengan role `subscriber` 0-capability +
+session terpisah, i18n di-skip, multisite TIDAK dibangun — runbook clone-
+deploy sebagai gantinya) plus ground-truth findings dan dependency baru
+yang perlu ditambahkan tiap fase.
+
+### Phase 10 — Admin list search/filter/pagination/bulk actions (selesai)
+
+`ContentService`/`UserService`/`MediaService` dapat `list(filters)`/
+`count(filters)` dengan `search` (ILIKE). Semua endpoint list admin
+(`/api/posts`, `/api/pages`, `/api/users`, `/api/media`) sekarang balikin
+envelope `{items, page, totalPages, total}` — breaking change, SEMUA
+consumer lama (dashboard, trash.vue, page parent-picker, media picker di
+settings/posts/pages editor) sudah diupdate unwrap `.items`. Endpoint bulk
+baru (`POST /api/{posts,pages,users,media}/bulk`) loop method single-item
+yang sudah ada, partial-failure tolerant (`{succeeded, failed}`). UI baru:
+`composables/useListQuery.ts` + `components/AdminDataTable.vue` (generic,
+`<script setup generic="T">`), dipakai di posts/pages/users/index.vue;
+`media.vue` reuse composable-nya tapi tetap grid layout sendiri.
+
+**Gotcha ditemukan**: `useApiFetch` TIDAK auto-refetch kalau query option-nya
+`computed()` biasa (closure fetcher capture `opts` sekali, dan ofetch tidak
+bisa serialize Vue ref sebagai query value). Fix: pakai `reactive()` object
+stabil (di-mutate, bukan diganti) + `refresh()` eksplisit di `watch` —
+closure baca ulang property reactive object itu saat dipanggil lagi.
+`api.ts` sendiri TIDAK disentuh (Gotcha #17) — ini pattern di call-site saja.
+
+**Diverifikasi runtime**: seed 25 post → search/pagination math benar (25
+post, limit 10 → 3 halaman) → bulk trash/delete id nyata → bulk request
+campuran id valid+invalid balikin partial success dalam SATU response
+(bukan 500 total) → bulk suspend user beneran ubah status → SSR semua
+halaman list termasuk state `?search=`/`?page=` → cleanup total. Typecheck/
+lint bersih, `pnpm test` 29/29. Build+deploy `pm2 restart selftaught-admin`
+— live.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
