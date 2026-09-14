@@ -9,3 +9,8 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   vue-demi: true
+overrides:
+  # Nuxt devtools pulls an old, vulnerable drizzle-orm transitively via
+  # unstorage/db0 (dev-only tooling, never shipped to production builds) —
+  # force it to the same patched version packages/core already uses directly.
+  drizzle-orm: ^0.45.2
