@@ -1,4 +1,4 @@
-import { and, count as countRows, desc, eq, lte } from "drizzle-orm";
+import { and, count as countRows, desc, eq, ilike, lte, or } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { content } from "../../db/schema/content";
 import type { RevisionService } from "../../domain/revisions/revision-service";
@@ -35,6 +35,7 @@ export interface UpdateContentInput {
 export interface ListContentFilters {
   type?: string;
   status?: ContentStatus;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -251,10 +252,18 @@ export class ContentService {
     return this.db.query.content.findFirst({ where: and(eq(content.type, type), eq(content.slug, slug)) });
   }
 
+  private searchCondition(search?: string) {
+    if (!search) return undefined;
+    const pattern = `%${search}%`;
+    return or(ilike(content.title, pattern), ilike(content.slug, pattern));
+  }
+
   list(filters: ListContentFilters = {}) {
     const conditions = [];
     if (filters.type) conditions.push(eq(content.type, filters.type));
     if (filters.status) conditions.push(eq(content.status, filters.status));
+    const search = this.searchCondition(filters.search);
+    if (search) conditions.push(search);
 
     return this.db.query.content.findMany({
       where: conditions.length ? and(...conditions) : undefined,
@@ -264,10 +273,12 @@ export class ContentService {
     });
   }
 
-  async count(filters: Pick<ListContentFilters, "type" | "status"> = {}): Promise<number> {
+  async count(filters: Pick<ListContentFilters, "type" | "status" | "search"> = {}): Promise<number> {
     const conditions = [];
     if (filters.type) conditions.push(eq(content.type, filters.type));
     if (filters.status) conditions.push(eq(content.status, filters.status));
+    const search = this.searchCondition(filters.search);
+    if (search) conditions.push(search);
 
     const [row] = await this.db
       .select({ value: countRows() })

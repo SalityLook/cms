@@ -67,6 +67,18 @@ export async function useApiFetch<T>(url: string, opts?: Record<string, unknown>
   return { data: data as Ref<T | null>, pending, error, refresh, execute };
 }
 
+export interface Paginated<T> {
+  items: T[];
+  page: number;
+  totalPages: number;
+  total: number;
+}
+
+export interface BulkActionResult {
+  succeeded: string[];
+  failed: { id: string; error: string }[];
+}
+
 export interface TermSummary {
   id: string;
   taxonomy: string;

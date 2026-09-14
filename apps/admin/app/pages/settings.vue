@@ -2,7 +2,8 @@
 definePageMeta({ middleware: "auth" });
 
 const { data: settings, refresh } = await useApiFetch<SettingsMap>("/api/settings");
-const { data: mediaItems } = await useApiFetch<MediaItem[]>("/api/media");
+const { data: mediaData } = await useApiFetch<Paginated<MediaItem>>("/api/media");
+const mediaItems = computed(() => mediaData.value?.items ?? []);
 
 const siteName = ref((settings.value?.siteName as string) ?? "");
 const siteDescription = ref((settings.value?.siteDescription as string) ?? "");

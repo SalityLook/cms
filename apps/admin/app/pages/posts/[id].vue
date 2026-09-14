@@ -13,7 +13,8 @@ if (!post.value) {
   throw createError({ statusCode: 404, statusMessage: "Post not found" });
 }
 
-const { data: mediaItems } = await useApiFetch<MediaItem[]>("/api/media");
+const { data: mediaData } = await useApiFetch<Paginated<MediaItem>>("/api/media");
+const mediaItems = computed(() => mediaData.value?.items ?? []);
 const { data: categories } = await useApiFetch<TermSummary[]>("/api/taxonomy/category");
 const { data: tags } = await useApiFetch<TermSummary[]>("/api/taxonomy/tag");
 const { data: revisions, refresh: refreshRevisions } = await useApiFetch<RevisionSummary[]>(`/api/posts/${id}/revisions`);

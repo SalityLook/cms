@@ -9,9 +9,12 @@ const { data: me } = await useFetch("/api/auth/me");
 // composable-context-restoration transform, which targets simple
 // `await useXxx()` statements; wrapping calls in Promise.all is untested
 // here and risky to introduce without re-verifying SSR end-to-end.
-const { data: posts } = await useApiFetch<PostSummary[]>("/api/posts");
-const { data: pages } = await useApiFetch<PageSummary[]>("/api/pages");
-const { data: media } = await useApiFetch<MediaItem[]>("/api/media");
+const { data: postsData } = await useApiFetch<Paginated<PostSummary>>("/api/posts");
+const { data: pagesData } = await useApiFetch<Paginated<PageSummary>>("/api/pages");
+const { data: mediaData } = await useApiFetch<Paginated<MediaItem>>("/api/media");
+const posts = computed(() => postsData.value?.items ?? []);
+const pages = computed(() => pagesData.value?.items ?? []);
+const media = computed(() => mediaData.value?.items ?? []);
 
 const publishedPosts = computed(() => posts.value?.filter((p) => p.status === "published").length ?? 0);
 const draftPosts = computed(

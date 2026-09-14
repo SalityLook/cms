@@ -12,8 +12,10 @@ if (!page.value) {
   throw createError({ statusCode: 404, statusMessage: "Page not found" });
 }
 
-const { data: mediaItems } = await useApiFetch<MediaItem[]>("/api/media");
-const { data: otherPages } = await useApiFetch<PageSummary[]>("/api/pages");
+const { data: mediaData } = await useApiFetch<Paginated<MediaItem>>("/api/media");
+const mediaItems = computed(() => mediaData.value?.items ?? []);
+const { data: otherPagesData } = await useApiFetch<Paginated<PageSummary>>("/api/pages");
+const otherPages = computed(() => otherPagesData.value?.items ?? []);
 const { data: revisions, refresh: refreshRevisions } = await useApiFetch<RevisionSummary[]>(`/api/pages/${id}/revisions`);
 const { data: seo } = await useApiFetch<ContentSeo | null>(`/api/pages/${id}/seo`);
 

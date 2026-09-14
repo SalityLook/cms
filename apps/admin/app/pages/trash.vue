@@ -1,7 +1,8 @@
 <script setup lang="ts">
 definePageMeta({ middleware: "auth" });
 
-const { data: posts, refresh } = await useApiFetch<PostSummary[]>("/api/posts", { query: { status: "trashed" } });
+const { data, refresh } = await useApiFetch<Paginated<PostSummary>>("/api/posts", { query: { status: "trashed" } });
+const posts = computed(() => data.value?.items ?? []);
 
 async function onUntrash(id: string) {
   await apiFetch(`/api/posts/${id}/untrash`, { method: "POST" });

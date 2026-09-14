@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, count as countRows, eq, ilike, or } from "drizzle-orm";
 import { hashPassword, verifyPassword } from "../../auth/password";
 import type { Database } from "../../db/client";
 import { users } from "../../db/schema/users";
@@ -8,6 +8,13 @@ export interface CreateUserInput {
   email: string;
   password: string;
   displayName: string;
+}
+
+export interface ListUserFilters {
+  search?: string;
+  status?: "active" | "suspended";
+  limit?: number;
+  offset?: number;
 }
 
 export class UserService {
@@ -33,8 +40,31 @@ export class UserService {
     return this.db.query.users.findFirst({ where: eq(users.id, id) });
   }
 
-  list() {
-    return this.db.query.users.findMany({ orderBy: (row, { asc }) => [asc(row.email)] });
+  list(filters: ListUserFilters = {}) {
+    return this.db.query.users.findMany({
+      where: this.buildFilterConditions(filters),
+      orderBy: (row, { asc }) => [asc(row.email)],
+      limit: filters.limit,
+      offset: filters.offset
+    });
+  }
+
+  async count(filters: Pick<ListUserFilters, "search" | "status"> = {}): Promise<number> {
+    const [row] = await this.db
+      .select({ value: countRows() })
+      .from(users)
+      .where(this.buildFilterConditions(filters));
+    return row?.value ?? 0;
+  }
+
+  private buildFilterConditions(filters: Pick<ListUserFilters, "search" | "status">) {
+    const conditions = [];
+    if (filters.status) conditions.push(eq(users.status, filters.status));
+    if (filters.search) {
+      const pattern = `%${filters.search}%`;
+      conditions.push(or(ilike(users.email, pattern), ilike(users.displayName, pattern)));
+    }
+    return conditions.length ? and(...conditions) : undefined;
   }
 
   async setStatus(id: string, status: "active" | "suspended") {

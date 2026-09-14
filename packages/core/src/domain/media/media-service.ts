@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { count as countRows, eq, ilike, or } from "drizzle-orm";
 import sharp from "sharp";
 import type { Database } from "../../db/client";
 import { media } from "../../db/schema/media";
@@ -29,6 +29,12 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MiB
+
+export interface ListMediaFilters {
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
 
 export class MediaService {
   constructor(
@@ -85,9 +91,28 @@ export class MediaService {
     return { ...row, url: this.storage.getUrl(key) };
   }
 
-  async list() {
-    const rows = await this.db.query.media.findMany({ orderBy: (row, { desc }) => [desc(row.createdAt)] });
+  async list(filters: ListMediaFilters = {}) {
+    const rows = await this.db.query.media.findMany({
+      where: this.searchCondition(filters.search),
+      orderBy: (row, { desc }) => [desc(row.createdAt)],
+      limit: filters.limit,
+      offset: filters.offset
+    });
     return rows.map((row) => ({ ...row, url: this.storage.getUrl(row.path) }));
+  }
+
+  async count(filters: Pick<ListMediaFilters, "search"> = {}): Promise<number> {
+    const [row] = await this.db
+      .select({ value: countRows() })
+      .from(media)
+      .where(this.searchCondition(filters.search));
+    return row?.value ?? 0;
+  }
+
+  private searchCondition(search?: string) {
+    if (!search) return undefined;
+    const pattern = `%${search}%`;
+    return or(ilike(media.originalFileName, pattern), ilike(media.mimeType, pattern));
   }
 
   getById(id: string) {

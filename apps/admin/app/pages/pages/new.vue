@@ -3,7 +3,8 @@ import type { ContentDocument } from "@selftaught/core";
 
 definePageMeta({ middleware: "auth" });
 
-const { data: existingPages } = await useApiFetch<PageSummary[]>("/api/pages");
+const { data: existingPagesData } = await useApiFetch<Paginated<PageSummary>>("/api/pages");
+const existingPages = computed(() => existingPagesData.value?.items ?? []);
 
 const title = ref("");
 const slug = ref("");
