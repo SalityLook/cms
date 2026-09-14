@@ -15,13 +15,17 @@ gotcha yang sudah ditemukan, supaya pekerjaan bisa lanjut tanpa internet dan
 tanpa perlu re-derive keputusan yang sudah diambil.
 
 **STATUS: semua 8 fase (Phase 0-7) dari roadmap awal sudah selesai dan
-ter-commit.** CMS ini punya: auth+RBAC, content CRUD lengkap dengan block
-editor, taxonomies, media library, revisions, publishing workflow penuh
-(draft/pending/scheduled/published/trashed + cron auto-publish), SEO
-subsystem, theme layer yang swappable, dan hook/plugin system dengan contoh
-plugin yang benar-benar jalan. Lihat bagian "Item yang sengaja ditunda" di
-paling bawah dokumen ini untuk daftar hal yang BUKAN bug/lupa, melainkan
-keputusan scope sadar sepanjang pengerjaan (page CRUD, Roles admin UI, dll).
+ter-commit, ditambah 4 putaran pasca-roadmap** (Users & Roles admin UI,
+automated tests, CRUD content type "page", dan production hardening — lihat
+"Pekerjaan pasca-roadmap #1-4" di bawah). CMS ini punya: auth+RBAC, content
+CRUD lengkap (post & page) dengan block editor, taxonomies, media library,
+revisions, publishing workflow penuh (draft/pending/scheduled/published/
+trashed + cron auto-publish), SEO subsystem, theme layer yang swappable,
+hook/plugin system dengan contoh plugin yang benar-benar jalan, dan hardening
+produksi (rate limiting, validasi upload, status code error presisi,
+dependency audit bersih, CI, backup/restore). Lihat bagian "Item yang sengaja
+ditunda" di paling bawah dokumen ini untuk daftar hal yang BUKAN bug/lupa,
+melainkan keputusan scope sadar sepanjang pengerjaan.
 
 ## Keputusan arsitektur (final, jangan diubah tanpa alasan kuat)
 
@@ -105,7 +109,10 @@ selftaught/
 │   │   ├── server/plugins/00.load-plugins.ts  # Nitro plugin: jalankan setup() tiap plugin + sync capability ke DB
 │   │   ├── app/plugins/load-plugins.ts    # Nuxt app plugin: daftarkan editor panel plugin ke adminUIRegistry
 │   │   ├── app/utils/admin-ui-registry.ts # AdminUIRegistry (UI-only, TIDAK di core) — registerMenuItem/registerEditorPanel
-│   │   └── server/api/posts/[id]/meta.{get,put}.ts  # baca/tulis content_meta (dipakai plugin panel)
+│   │   ├── server/api/posts/[id]/meta.{get,put}.ts  # baca/tulis content_meta (dipakai plugin panel)
+│   │   ├── server/utils/api-handler.ts    # defineApiHandler — map CapabilityError/NotFoundError/TransitionError/ValidationError ke status code REST
+│   │   ├── server/utils/rate-limit.ts     # in-memory token bucket, dipakai server/api/auth/login.post.ts
+│   │   └── server/api/users/[id]/password.put.ts  # admin-to-user password reset (capability manage_users)
 │   └── frontend/                # Nuxt 4, port 3001 — TIPIS: cuma server/ + config, extends themes/default
 │       ├── nuxt.config.ts       # extends + routeRules (SWR 60s di /blog,/category,/tag) + runtimeConfig
 │       ├── server/api/posts/{index,[slug]}.get.ts       # index.get.ts: paginated {posts,page,totalPages}; [slug] includes resolved `seo`+`jsonLd`
@@ -116,11 +123,14 @@ selftaught/
 │   ├── package.json             # declare @selftaught/core+blocks (deps) & @nuxt/kit+tailwindcss/vite+nuxt+vue (devDeps)
 │   ├── nuxt.config.ts           # css + tailwindcss vite plugin, pakai createResolver() bukan `~/...` (Gotcha #14)
 │   └── app/{app.vue,error.vue,pages/{index,blog/{index,[slug]},category/[slug],tag/[slug]}.vue,assets/css/main.css}
-└── plugins/example-plugin/      # @selftaught/example-plugin — bukti hook/registry/AdminUI extension points jalan
-    ├── package.json             # exports: "./server" (definePlugin), "./editor-panel" (Vue component wrapper)
-    ├── src/server.ts            # definePlugin({ id, setup(ctx) {...} }) — register capability + hook content:published
-    ├── src/EditorPanel.vue      # panel sidebar post editor, baca/tulis content_meta lewat $fetch polos
-    └── src/editor-panel.ts      # re-export .ts tipis dari .vue (lihat catatan "*.vue subpath export" di bawah)
+├── plugins/example-plugin/      # @selftaught/example-plugin — bukti hook/registry/AdminUI extension points jalan
+│   ├── package.json             # exports: "./server" (definePlugin), "./editor-panel" (Vue component wrapper)
+│   ├── src/server.ts            # definePlugin({ id, setup(ctx) {...} }) — register capability + hook content:published
+│   ├── src/EditorPanel.vue      # panel sidebar post editor, baca/tulis content_meta lewat $fetch polos
+│   └── src/editor-panel.ts      # re-export .ts tipis dari .vue (lihat catatan "*.vue subpath export" di bawah)
+├── scripts/{backup,restore}.sh  # pg_dump+tar media / restore — lihat "Pekerjaan pasca-roadmap #4"
+├── .github/workflows/ci.yml     # lint/typecheck/test/build/audit di tiap push/PR ke master/main
+└── packages/core/src/{errors.ts,db/reset-password.ts}  # CapabilityError/NotFoundError/TransitionError/ValidationError; pnpm reset-password CLI
 ```
 
 `packages/core/src/domain/{taxonomy,media}/` menambahkan `TaxonomyService` dan
@@ -355,6 +365,35 @@ pnpm --filter @selftaught/core db:seed
       `apps/admin/app/utils/api.ts` untuk detail lengkap — **JANGAN diubah
       tanpa re-test SSR end-to-end (buka halaman `/posts/[id]` via curl
       dengan cookie session, bukan cuma jalankan typecheck).**
+
+18. **pnpm v12 memindahkan field `overrides` KELUAR dari `package.json`**.
+    Pola lama (`"pnpm": {"overrides": {...}}` di `package.json`) sekarang
+    cuma memicu warning `"pnpm" field in package.json is no longer read by
+    pnpm` dan TIDAK diterapkan. Override dependency transitif (dipakai untuk
+    memaksa versi patched `drizzle-orm` yang ditarik Nuxt devtools lewat
+    `unstorage`/`db0`) sekarang wajib ditaruh di top-level `overrides:` pada
+    `pnpm-workspace.yaml`. Lihat entry di sana untuk contoh + alasannya.
+
+19. **Script root yang nested lewat `pnpm --filter ... <script>` JANGAN
+    dibungkus dengan trailing `--` di definisi script-nya sendiri** kalau
+    script itu juga menerima argumen positional dari command line (mis.
+    `pnpm reset-password <email> <password>`). `pnpm <script> -- <args>`
+    SUDAH otomatis forward `<args>` ke script target lewat satu `--`; kalau
+    definisi script root-nya SENDIRI sudah diakhiri `--`
+    (`"reset-password": "... pnpm --filter @selftaught/core reset-password --"`),
+    argumen yang dikirim user numpuk JADI DUA `--` beruntun di argv final
+    (`tsx src/db/reset-password.ts -- -- email pass` atau bahkan tanpa user
+    menambah apa pun, `-- email pass` tetap leak sebagai argv literal
+    `["--", "email", "pass"]`), yang salah-parse jadi
+    `email="--"`/password lain, memunculkan error yang membingungkan
+    ("No user found with email --" atau validasi panjang password gagal
+    padahal password-nya valid). **Fix**: jangan tambahkan `--` apa pun di
+    definisi script root — cukup
+    `"reset-password": "dotenv -e .env -- pnpm --filter @selftaught/core reset-password"`,
+    lalu panggil `pnpm reset-password email pass` langsung tanpa `--` sama
+    sekali. Kalau ragu argv-nya benar, debug dengan panggil `tsx` script
+    target secara langsung (skip semua layer `pnpm --filter`) untuk
+    memastikan script itu sendiri benar sebelum curiga ke layer pnpm.
 
 ## Kredensial dev (lokal, dari seed)
 
@@ -614,10 +653,8 @@ dipertimbangkan dan didokumentasikan di titik ia di-skip:
 3. ~~**Roles & Capabilities admin UI**~~ — **SELESAI** (lihat "Ringkasan:
    Users & Roles admin UI" di bawah). Sisa yang masih belum ada: bikin role
    CUSTOM lewat UI (di luar 4 `SYSTEM_ROLES` bawaan) — lihat #6.
-4. **Custom error classes untuk HTTP status code presisi** (dicatat di Phase
-   4) — service layer (`assertCan`, `transitionStatus`, dst.) throw `Error`
-   polos yang jadi HTTP 500 generik lewat h3, bukan 400/403 yang lebih tepat.
-   Fungsional benar (pesan error tetap sampai ke user), cuma kurang REST-precise.
+4. ~~**Custom error classes untuk HTTP status code presisi**~~ — **SELESAI**
+   (lihat "Pekerjaan pasca-roadmap #4: Production hardening" di bawah).
 5. **`delete_pages`/`publish_pages` capability terpisah** — tipe "page"
    SEKARANG SUDAH ada CRUD penuh (#1 selesai), tapi masih sengaja berbagi
    SATU capability `edit_pages` untuk edit/publish/delete sekaligus (lihat
@@ -751,6 +788,123 @@ bersih setelah cleanup. Lint+typecheck bersih di semua package/app,
 Dengan ini, SEMUA item "sengaja ditunda" nomor #1 dan #3 sudah selesai;
 `settings.homepageContentId` (#2) masih ditunda tapi sekarang independen
 (lihat catatan di atas).
+
+## Pekerjaan pasca-roadmap #4: Production hardening (selesai)
+
+Menjawab pertanyaan "apakah CMS ini siap dipakai di produksi" — sebelumnya
+CMS *functionally complete* (semua fase roadmap selesai) tapi belum
+*production-hardened*. Sesi ini menutup semua gap konkret yang teridentifikasi
+di bawah kategori security & operational.
+
+- **Dependency security**: `pnpm audit` dari 13 vulnerability (1 kritis/4
+  high/7 moderate/1 low) → 4 (0 kritis/0 high/3 moderate/1 low). Bump
+  `drizzle-orm` → `^0.45.2`, `sharp` → `^0.35.4`, `drizzle-kit` → `^0.31.10`,
+  `vitest` → `^4.1.9`. `drizzle-orm` lama juga ditarik transitif oleh Nuxt
+  devtools lewat `unstorage`/`db0` — dipaksa ke versi patched via
+  `pnpm-workspace.yaml` `overrides:` (lihat Gotcha #18 soal kenapa BUKAN di
+  `package.json`). 4 vulnerability sisa dinilai tidak applicable ke code
+  path kita (diverifikasi via grep, bukan diabaikan begitu saja): komponen
+  Nuxt UI form yang rentan (`UForm`/`UAuthForm`) tidak pernah dipakai di
+  codebase ini, Tiptap cuma diakses admin yang sudah authenticated, esbuild
+  cuma kepakai lewat drizzle-kit CLI (dev-time, bukan server produksi).
+
+- **HTTP status code presisi untuk error domain** (menutup item #4 di
+  "Item yang sengaja ditunda"): 4 error class baru di
+  `packages/core/src/errors.ts` (`CapabilityError`, `NotFoundError`,
+  `TransitionError`, `ValidationError`, framework-agnostic — tidak import
+  h3/Nuxt), dilempar dari `ContentService`/`MediaService` di titik yang
+  sebelumnya `throw new Error(...)` polos. `apps/admin/server/utils/api-handler.ts`
+  (`defineApiHandler`, wrapper tipis di atas `defineEventHandler`) meng-catch
+  4 class itu dan map ke status code REST yang tepat (403/404/409/400),
+  diterapkan ke semua 21 endpoint write posts/pages/media via
+  `sed -i 's/export default defineEventHandler(/export default defineApiHandler(/'`.
+  **Diverifikasi runtime via curl** (bukan cuma typecheck — disiplin Gotcha
+  #17): NotFoundError→404, ValidationError→400 (juga zod `readValidatedBody`
+  tetap 400 seperti sebelumnya, tidak konflik), TransitionError→409 (transisi
+  ilegal `trashed→published`).
+
+- **Rate limiting login**: in-memory token bucket
+  (`apps/admin/server/utils/rate-limit.ts`, cocok untuk target deployment
+  single-instance — BUKAN Redis-backed, tidak akan sinkron across multiple
+  instance kalau nanti di-scale horizontal, catat ini kalau architecture
+  berubah). `POST /api/auth/login` membatasi 20 percobaan/15 menit per-IP
+  DAN 5 percobaan/15 menit per-email (dua dimensi independen — email attack
+  yang distribusi IP-nya luas tetap ke-throttle). **Diverifikasi runtime**:
+  6 percobaan password salah beruntun ke email yang sama → percobaan ke-6
+  dapat 429; bucket in-memory berarti restart proses mengosongkan semua
+  limit (dipakai sengaja saat testing untuk lanjut verifikasi status code
+  lain tanpa nunggu window 15 menit).
+
+- **Validasi upload media**: `MediaService.upload()`
+  (`packages/core/src/domain/media/media-service.ts`) menolak mime type di
+  luar allowlist (`image/jpeg,png,gif,webp,svg+xml` + `application/pdf`),
+  file kosong, dan file > 10MB — masing-masing `ValidationError` (jadi 400
+  lewat `defineApiHandler`, bukan crash/500). `POST /api/media` juga cek
+  header `Content-Length` LEBIH DULU sebelum `readMultipartFormData` (413
+  early-reject) supaya upload raksasa tidak keburu dibaca penuh ke memory
+  dulu baru ditolak. **Diverifikasi runtime**: upload `.txt` sebagai
+  `image/jpeg` palsu → 400 (mime check baca actual content type dari
+  request, bukan percaya ekstensi); upload file 11MB → 413 dari
+  Content-Length precheck.
+
+- **Reset password darurat**: `UserService.setPassword()` (baru) dipanggil
+  dari dua jalur independen — (1) `PUT /api/users/[id]/password` +
+  UI "Reset Password" di `/users/[id]` (butuh admin lain yang masih bisa
+  login, capability `manage_users`), (2)
+  `packages/core/src/db/reset-password.ts` + `pnpm reset-password <email>
+  <password>` (bicara langsung ke DB, dipakai kalau TIDAK ADA admin yang
+  bisa login sama sekali). **Sengaja TIDAK membangun** self-service
+  email-based password reset — tidak ada infrastruktur SMTP tersedia,
+  keputusan scope sadar, bukan oversight.
+
+- **CI** (`.github/workflows/ci.yml`, belum pernah dijalankan sungguhan di
+  GitHub Actions saat ini ditulis — tapi tiap langkahnya sudah
+  diverifikasi lolos secara manual/lokal satu per satu: lint, typecheck,
+  `pnpm test`, `pnpm build:admin`, `pnpm build:frontend`,
+  `pnpm audit --audit-level=high`): trigger push ke `master`/`main` + PR,
+  service container `postgres:16-alpine`, `.env` CI dibuat inline via
+  heredoc (lihat Gotcha #8 soal kenapa root script butuh `.env` fisik).
+
+- **Backup & restore**: `scripts/backup.sh`/`scripts/restore.sh` — `pg_dump`
+  (gzip) + tar folder media, timestamped, baca `DATABASE_URL`/
+  `MEDIA_LOCAL_PATH` dari `.env` root sama seperti script lain.
+  **Diverifikasi jalan** terhadap DB dev asli (dump + archive media
+  berhasil, ukuran file masuk akal). `restore.sh` minta konfirmasi manual
+  sebelum menimpa DB (destruktif, tidak pernah dites end-to-end karena akan
+  menimpa data dev yang sedang dipakai — logic-nya simetris dengan
+  `backup.sh` yang sudah terverifikasi, jadi risiko rendah, tapi catat ini
+  kalau ada masalah nanti). `backups/` ditambahkan ke `.gitignore`.
+
+**Item dari gap list awal yang SENGAJA didokumentasikan sebagai deferred,
+bukan diam-diam dilewati**:
+- **Structured logging/monitoring** — belum diimplementasikan. CMS ini
+  masih pakai `console.log`/Nitro default logging. Untuk deployment
+  produksi sungguhan, tambahkan structured logger (pino/dst) di boundary
+  `defineApiHandler` (titik yang sama dipakai untuk status code mapping di
+  atas, jadi tinggal tambah 1 baris log di catch block) + kirim ke
+  observability tool pilihan (self-hosted: Grafana Loki; SaaS: apa saja).
+  Tidak dibangun sekarang karena pilihan tool sangat tergantung preferensi
+  operator deployment — bukan keputusan yang bisa diambil sepihak tanpa
+  input user.
+- **Docker migration automation** — `docker-compose.yml` tidak otomatis
+  jalankan `db:migrate`/`db:seed` saat container start (lihat bagian
+  "Deployment produksi" di README — harus manual dari host). Tetap manual
+  by design: auto-migrate on boot itu sendiri punya risiko (migration gagal
+  separuh jalan saat container restart looping) yang lebih baik dikontrol
+  operator secara eksplisit, bukan otomatis.
+- **S3/scalable object storage** — dinilai BUKAN gap sungguhan terhadap
+  target deployment yang sudah diputuskan sejak awal (self-hosted
+  single-instance, lihat "Keputusan arsitektur" #4 di atas).
+  `StorageAdapter` interface sudah disiapkan sejak Phase 3 khusus supaya ini
+  gampang ditambah KALAU target deployment berubah ke multi-instance/HA —
+  tapi menambahnya sekarang tanpa kebutuhan itu adalah over-engineering,
+  bukan hardening.
+
+**Belum dijalankan sungguhan di GitHub Actions** (cuma diverifikasi lolos
+secara lokal langkah-per-langkah) — cek `Actions` tab repo setelah push
+pertama ke `master` untuk konfirmasi CI benar-benar hijau di lingkungan
+GitHub, ada kemungkinan kecil perbedaan environment (mis. versi tool
+runner) yang tidak kena di sandbox ini.
 
 ## Git
 
