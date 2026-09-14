@@ -1317,6 +1317,36 @@ halaman list termasuk state `?search=`/`?page=` → cleanup total. Typecheck/
 lint bersih, `pnpm test` 29/29. Build+deploy `pm2 restart selftaught-admin`
 — live.
 
+### Phase 11 — Kategori hierarkis (selesai)
+
+`terms.parentId` sudah ada di schema sejak awal, tidak pernah dipakai —
+fase tanpa migrasi. `TaxonomyService` dapat `updateTerm`, `listTree`
+(flat→tree client-side), guard cycle privat `wouldCreateCycle` (walk
+ancestor chain, FK sendiri tidak cegah loop A→B→A), `getAncestors`
+(breadcrumb publik), `listChildren`. `deleteTerm` sekarang guard kalau
+masih ada child (`ValidationError` rapi, bukan 500 mentah dari Postgres
+FK-restrict). Endpoint baru `[id].patch.ts` + `tree.get.ts` (terpisah dari
+`index.get.ts` yang tetap flat, dipakai toggle category/tag di editor
+post/page). `index.post.ts`/`[id].delete.ts` taxonomy pindah dari
+`defineEventHandler` ke `defineApiHandler` supaya guard baru benar-benar
+jadi 400. Admin: `TaxonomyManager.vue` dapat prop `hierarchical` (category
+saja, tag tetap flat), parent-picker, inline edit, tree berindentasi.
+Publik: `category/[slug].vue` breadcrumb dari ancestor chain + chip child
+category.
+
+**Kesalahan kecil yang ketahuan sebelum deploy**: draft pertama breadcrumb
+pakai `<UIcon>` — theme publik SENGAJA tidak punya Nuxt UI/icon package
+(keputusan sejak redesign Phase 6). Diganti separator teks "/" biasa,
+konsisten pola theme yang sudah ada.
+
+**Diverifikasi runtime**: parent+child category → set parent Programming
+ke child-nya sendiri → 400 (cycle) → hapus Programming selagi masih ada
+child → 400 → hapus child dulu → sukses → assign post ke child, publish →
+`ancestors`/`children` di response API benar → breadcrumb SSR publik benar
+→ tree UI admin render nesting benar → cleanup total (content+terms 0).
+Typecheck/lint/test bersih, CSS bundle re-check (Gotcha #21). Deploy kedua
+app — live.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
