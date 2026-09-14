@@ -15,6 +15,7 @@
     "db:migrate": "dotenv -e .env -- pnpm --filter @selftaught/core db:migrate",
     "db:seed": "dotenv -e .env -- pnpm --filter @selftaught/core db:seed",
     "db:studio": "dotenv -e .env -- pnpm --filter @selftaught/core db:studio",
+    "reset-password": "dotenv -e .env -- pnpm --filter @selftaught/core reset-password",
     "lint": "eslint .",
     "typecheck": "pnpm -r --parallel typecheck",
     "test": "dotenv -e .env -- vitest run"

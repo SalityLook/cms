@@ -51,6 +51,17 @@ export class UserService {
     return user;
   }
 
+  /** Admin-initiated (or CLI bootstrap script) password reset — no old-password check, unlike a self-service change-password flow would need. */
+  async setPassword(id: string, newPassword: string) {
+    const passwordHash = await hashPassword(newPassword);
+    const [user] = await this.db
+      .update(users)
+      .set({ passwordHash, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
+  }
+
   async verifyCredentials(email: string, password: string) {
     const user = await this.findByEmail(email);
     if (!user || user.status !== "active") return null;
