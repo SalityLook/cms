@@ -14,6 +14,7 @@
     "@nuxt/eslint": "^0.7.4"
   },
   "dependencies": {
+    "@nuxt/fonts": "^0.14.0",
     "@selftaught/blocks": "workspace:*",
     "@selftaught/core": "workspace:*",
     "@selftaught/tailwind-config": "workspace:*",

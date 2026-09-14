@@ -14,6 +14,11 @@ const doc = ref<ContentDocument>({ version: 1, type: "doc", content: [] });
 const saving = ref(false);
 const error = ref("");
 
+const parentOptions = computed(() => [
+  { label: "(tidak ada — top-level)", value: null },
+  ...(existingPages.value ?? []).map((p) => ({ label: p.title || "(Tanpa judul)", value: p.id }))
+]);
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -53,49 +58,50 @@ async function onSave() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <NuxtLink to="/pages" class="font-semibold">Pages</NuxtLink>
-        <span class="text-gray-400">/</span>
-        <span>Baru</span>
+  <div>
+    <PageHeader title="Page Baru">
+      <template #actions>
+        <UButton to="/pages" variant="ghost" color="neutral">Batal</UButton>
+        <UButton :loading="saving" icon="i-lucide-check" @click="onSave">Simpan Draft</UButton>
+      </template>
+    </PageHeader>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 space-y-4 min-w-0">
+        <UCard>
+          <div class="space-y-4">
+            <UFormField label="Judul">
+              <UInput v-model="title" class="w-full" placeholder="Judul page" size="lg" />
+            </UFormField>
+            <UFormField label="Slug">
+              <UInput v-model="slug" class="w-full" placeholder="judul-page" />
+            </UFormField>
+            <UFormField label="Ringkasan (opsional)">
+              <UTextarea v-model="excerpt" class="w-full" :rows="2" />
+            </UFormField>
+          </div>
+        </UCard>
+
+        <BlockEditor v-model="doc" />
+
+        <UAlert v-if="error" color="error" variant="subtle" :title="error" />
       </div>
-      <UButton :loading="saving" @click="onSave">Simpan Draft</UButton>
-    </header>
 
-    <main class="p-6 max-w-3xl mx-auto space-y-4">
-      <UCard>
-        <div class="space-y-4">
-          <UFormField label="Judul">
-            <UInput v-model="title" class="w-full" placeholder="Judul page" />
-          </UFormField>
-          <UFormField label="Slug">
-            <UInput v-model="slug" class="w-full" placeholder="judul-page" />
-          </UFormField>
-          <UFormField label="Ringkasan (opsional)">
-            <UTextarea v-model="excerpt" class="w-full" :rows="2" />
-          </UFormField>
-        </div>
-      </UCard>
-
-      <BlockEditor v-model="doc" />
-
-      <UCard>
-        <h2 class="font-medium mb-3">Hierarki</h2>
-        <div class="space-y-4">
-          <UFormField label="Parent Page (opsional)">
-            <select v-model="parentId" class="w-full border border-gray-300 dark:border-gray-700 rounded-md px-2 py-1.5 bg-transparent text-sm">
-              <option :value="null">(tidak ada — top-level)</option>
-              <option v-for="p in existingPages" :key="p.id" :value="p.id">{{ p.title }}</option>
-            </select>
-          </UFormField>
-          <UFormField label="Urutan Menu">
-            <UInput v-model.number="menuOrder" type="number" class="w-full" />
-          </UFormField>
-        </div>
-      </UCard>
-
-      <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-    </main>
+      <div class="space-y-4 min-w-0">
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Hierarki</h2>
+          </template>
+          <div class="space-y-4">
+            <UFormField label="Parent Page (opsional)">
+              <USelectMenu v-model="parentId" :items="parentOptions" value-key="value" class="w-full" />
+            </UFormField>
+            <UFormField label="Urutan Menu">
+              <UInput v-model.number="menuOrder" type="number" class="w-full" />
+            </UFormField>
+          </div>
+        </UCard>
+      </div>
+    </div>
   </div>
 </template>

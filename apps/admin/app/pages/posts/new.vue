@@ -47,21 +47,19 @@ async function onSave() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <NuxtLink to="/posts" class="font-semibold">Posts</NuxtLink>
-        <span class="text-gray-400">/</span>
-        <span>Baru</span>
-      </div>
-      <UButton :loading="saving" @click="onSave">Simpan Draft</UButton>
-    </header>
+  <div>
+    <PageHeader title="Post Baru">
+      <template #actions>
+        <UButton to="/posts" variant="ghost" color="neutral">Batal</UButton>
+        <UButton :loading="saving" icon="i-lucide-check" @click="onSave">Simpan Draft</UButton>
+      </template>
+    </PageHeader>
 
-    <main class="p-6 max-w-3xl mx-auto space-y-4">
+    <div class="max-w-3xl space-y-4">
       <UCard>
         <div class="space-y-4">
           <UFormField label="Judul">
-            <UInput v-model="title" class="w-full" placeholder="Judul post" />
+            <UInput v-model="title" class="w-full" placeholder="Judul post" size="lg" />
           </UFormField>
           <UFormField label="Slug">
             <UInput v-model="slug" class="w-full" placeholder="judul-post" />
@@ -74,7 +72,7 @@ async function onSave() {
 
       <BlockEditor v-model="doc" />
 
-      <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-    </main>
+      <UAlert v-if="error" color="error" variant="subtle" :title="error" />
+    </div>
   </div>
 </template>

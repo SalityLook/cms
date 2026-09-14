@@ -12,10 +12,11 @@ export default defineEventHandler(async (event) => {
   const { page, limit } = querySchema.parse(getQuery(event));
   const pageSize = limit ?? PAGE_SIZE;
 
-  const [posts, total] = await Promise.all([
+  const [rawPosts, total] = await Promise.all([
     contentService.list({ type: "post", status: "published", limit: pageSize, offset: (page - 1) * pageSize }),
     contentService.count({ type: "post", status: "published" })
   ]);
+  const posts = await enrichPostsForCards(rawPosts);
 
   return { posts, page, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
 });

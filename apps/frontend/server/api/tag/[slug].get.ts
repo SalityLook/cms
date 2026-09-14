@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
 
   const contentIds = await taxonomyService.contentIdsForTerm(term.id);
   const published = await contentService.list({ type: "post", status: "published" });
-  const posts = published.filter((post) => contentIds.includes(post.id));
+  const posts = await enrichPostsForCards(published.filter((post) => contentIds.includes(post.id)));
 
   return { term, posts };
 });

@@ -44,36 +44,40 @@ async function onDelete(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center gap-3">
-      <NuxtLink to="/" class="font-semibold">SelfTaught CMS</NuxtLink>
-      <span class="text-gray-400">/</span>
-      <span>{{ label }}</span>
-    </header>
+  <div>
+    <PageHeader :title="label" :description="`${terms?.length ?? 0} ${label.toLowerCase()}`" />
 
-    <main class="p-6 max-w-2xl mx-auto space-y-4">
-      <UCard>
-        <form class="flex items-end gap-3" @submit.prevent="onCreate">
-          <UFormField label="Nama" class="flex-1">
-            <UInput v-model="name" class="w-full" />
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <UCard class="lg:col-span-1 h-fit">
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Tambah {{ label.toLowerCase() }}</h2>
+        </template>
+        <form class="space-y-3" @submit.prevent="onCreate">
+          <UFormField label="Nama">
+            <UInput v-model="name" class="w-full" placeholder="mis. Teknologi" />
           </UFormField>
-          <UFormField label="Slug" class="flex-1">
-            <UInput v-model="slug" class="w-full" />
+          <UFormField label="Slug">
+            <UInput v-model="slug" class="w-full" placeholder="teknologi" />
           </UFormField>
-          <UButton type="submit" :loading="saving">Tambah</UButton>
+          <UButton type="submit" block :loading="saving">Tambah</UButton>
+          <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
         </form>
-        <p v-if="error" class="text-sm text-red-500 mt-2">{{ error }}</p>
       </UCard>
 
-      <UCard>
-        <ul class="divide-y divide-gray-100 dark:divide-gray-900">
-          <li v-for="term in terms" :key="term.id" class="py-2 flex items-center justify-between">
-            <span>{{ term.name }} <span class="text-gray-400 text-sm">/{{ term.slug }}</span></span>
-            <UButton size="xs" color="error" variant="ghost" @click="onDelete(term.id)">Hapus</UButton>
+      <UCard class="lg:col-span-2" :ui="{ body: 'p-0 sm:p-0' }">
+        <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+          <li v-for="term in terms" :key="term.id" class="py-3 px-4 flex items-center justify-between">
+            <div>
+              <span class="font-medium text-slate-900 dark:text-white">{{ term.name }}</span>
+              <span class="text-slate-400 text-sm ml-2">/{{ term.slug }}</span>
+            </div>
+            <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" @click="onDelete(term.id)" />
           </li>
-          <li v-if="!terms?.length" class="py-4 text-center text-gray-400">Belum ada {{ label.toLowerCase() }}.</li>
+          <li v-if="!terms?.length" class="py-12 text-center text-slate-400">
+            Belum ada {{ label.toLowerCase() }}.
+          </li>
         </ul>
       </UCard>
-    </main>
+    </div>
   </div>
 </template>

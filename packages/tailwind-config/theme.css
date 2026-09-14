@@ -2,13 +2,26 @@
  * Shared Tailwind v4 design tokens for admin, frontend and themes.
  * Consumed via: @import "@selftaught/tailwind-config/theme.css";
  * Themes may override these tokens locally after importing this file.
+ *
+ * Palette: a single indigo/violet hue (~260) carried across the full 50-950
+ * scale, used as the "brand" color everywhere (admin UI primary color via
+ * app.config.ts `ui.colors.primary: 'brand'`, and accents on the public
+ * theme). Neutral scale is Tailwind's built-in `slate` — no need to
+ * redeclare it here.
  */
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Lora", ui-serif, Georgia, serif;
 
-  --color-brand-50: oklch(0.98 0.01 260);
-  --color-brand-100: oklch(0.94 0.03 260);
+  --color-brand-50: oklch(0.98 0.012 260);
+  --color-brand-100: oklch(0.95 0.025 260);
+  --color-brand-200: oklch(0.9 0.05 260);
+  --color-brand-300: oklch(0.82 0.08 260);
+  --color-brand-400: oklch(0.7 0.13 260);
   --color-brand-500: oklch(0.58 0.18 260);
   --color-brand-600: oklch(0.5 0.19 260);
   --color-brand-700: oklch(0.42 0.18 260);
+  --color-brand-800: oklch(0.34 0.15 260);
+  --color-brand-900: oklch(0.27 0.12 260);
+  --color-brand-950: oklch(0.19 0.08 260);
 }

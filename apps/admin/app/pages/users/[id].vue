@@ -64,17 +64,15 @@ async function onSetPassword() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <NuxtLink to="/users" class="font-semibold">Users</NuxtLink>
-        <span class="text-gray-400">/</span>
-        <span>{{ user?.email }}</span>
-      </div>
-      <UButton :loading="saving" @click="onSave">Simpan</UButton>
-    </header>
+  <div>
+    <PageHeader title="Edit User" :description="user?.email">
+      <template #actions>
+        <UButton to="/users" variant="ghost" color="neutral">Batal</UButton>
+        <UButton :loading="saving" icon="i-lucide-check" @click="onSave">Simpan</UButton>
+      </template>
+    </PageHeader>
 
-    <main class="p-6 max-w-lg mx-auto space-y-4">
+    <div class="max-w-lg space-y-4">
       <UCard>
         <div class="space-y-4">
           <UFormField label="Email">
@@ -97,12 +95,14 @@ async function onSetPassword() {
       </UCard>
 
       <UCard>
-        <h2 class="font-medium mb-3">Roles</h2>
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Roles</h2>
+        </template>
         <div class="flex flex-wrap gap-2">
           <UButton
             v-for="role in roles"
             :key="role.key"
-            size="xs"
+            size="sm"
             :color="selectedRoleKeys.includes(role.key) ? 'primary' : 'neutral'"
             :variant="selectedRoleKeys.includes(role.key) ? 'solid' : 'outline'"
             @click="toggleRole(role.key)"
@@ -113,13 +113,15 @@ async function onSetPassword() {
       </UCard>
 
       <UCard>
-        <h2 class="font-medium mb-3">Reset Password</h2>
-        <p class="text-xs text-gray-400 mb-3">
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Reset Password</h2>
+        </template>
+        <p class="text-xs text-slate-400 mb-3">
           Set password baru langsung untuk user ini (tidak butuh password lama). Berguna kalau user lupa password
           atau untuk bootstrap ulang akses admin — lihat juga <code>pnpm reset-password</code> di README untuk reset
           lewat CLI kalau tidak ada admin lain yang bisa login.
         </p>
-        <div class="flex items-end gap-3">
+        <div class="flex flex-col sm:flex-row sm:items-end gap-3">
           <UFormField label="Password Baru (min. 8 karakter)" class="flex-1">
             <UInput v-model="newPassword" type="password" class="w-full" />
           </UFormField>
@@ -129,7 +131,7 @@ async function onSetPassword() {
         <p v-if="passwordError" class="text-sm text-red-500 mt-2">{{ passwordError }}</p>
       </UCard>
 
-      <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-    </main>
+      <UAlert v-if="error" color="error" variant="subtle" :title="error" />
+    </div>
   </div>
 </template>

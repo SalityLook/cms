@@ -9,14 +9,23 @@ function handleRetry() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center px-4">
+  <div class="min-h-screen flex items-center justify-center px-4 bg-white dark:bg-slate-950">
     <div class="text-center max-w-md">
-      <p class="text-6xl font-bold text-gray-300 dark:text-gray-700 mb-4">{{ error.statusCode }}</p>
-      <h1 class="text-xl font-semibold mb-2">
+      <div class="flex items-center justify-center gap-2 mb-8">
+        <span class="size-8 rounded-lg bg-brand-600 text-white flex items-center justify-center text-sm font-bold">S</span>
+        <span class="font-semibold tracking-tight text-slate-900 dark:text-white">SelfTaught</span>
+      </div>
+      <p class="font-serif text-7xl font-semibold text-brand-600/20 dark:text-brand-400/20 mb-4">{{ error.statusCode }}</p>
+      <h1 class="text-xl font-semibold text-slate-900 dark:text-white mb-2">
         {{ error.statusCode === 404 ? "Halaman tidak ditemukan" : "Terjadi kesalahan" }}
       </h1>
-      <p class="text-gray-500 mb-6">{{ error.statusMessage }}</p>
-      <button class="text-primary hover:underline" @click="handleRetry">Kembali ke beranda</button>
+      <p class="text-slate-500 dark:text-slate-400 mb-8">{{ error.statusMessage }}</p>
+      <button
+        class="inline-flex items-center gap-2 rounded-full bg-brand-600 px-6 py-3 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+        @click="handleRetry"
+      >
+        Kembali ke beranda
+      </button>
     </div>
   </div>
 </template>

@@ -10,13 +10,15 @@ if (!data.value) {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto px-4 py-12">
-    <h1 class="text-2xl font-semibold mb-6">Kategori: {{ data?.term.name }}</h1>
-    <ul class="space-y-4">
-      <li v-for="post in data?.posts" :key="post.id">
-        <NuxtLink :to="`/blog/${post.slug}`" class="text-lg font-medium hover:underline">{{ post.title }}</NuxtLink>
-      </li>
-      <li v-if="!data?.posts.length" class="text-gray-400">Belum ada post di kategori ini.</li>
-    </ul>
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
+    <p class="text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-2">Kategori</p>
+    <h1 class="font-serif text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-white mb-10">
+      {{ data?.term.name }}
+    </h1>
+
+    <div v-if="data?.posts.length" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-10">
+      <PostCard v-for="post in data.posts" :key="post.id" :post="post" />
+    </div>
+    <p v-else class="text-slate-400 text-center py-16">Belum ada post di kategori ini.</p>
   </div>
 </template>

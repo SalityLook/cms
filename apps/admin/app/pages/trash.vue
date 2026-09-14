@@ -15,26 +15,25 @@ async function onDelete(id: string) {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center gap-3">
-      <NuxtLink to="/posts" class="font-semibold">Posts</NuxtLink>
-      <span class="text-gray-400">/</span>
-      <span>Trash</span>
-    </header>
+  <div>
+    <PageHeader title="Trash" description="Post yang dipindahkan ke trash — pulihkan atau hapus permanen." />
 
-    <main class="p-6">
-      <UCard>
-        <ul class="divide-y divide-gray-100 dark:divide-gray-900">
-          <li v-for="post in posts" :key="post.id" class="py-2 flex items-center justify-between">
-            <span>{{ post.title }}</span>
-            <div class="flex items-center gap-2">
-              <UButton size="xs" variant="outline" @click="onUntrash(post.id)">Pulihkan</UButton>
-              <UButton size="xs" color="error" variant="ghost" @click="onDelete(post.id)">Hapus Permanen</UButton>
-            </div>
-          </li>
-          <li v-if="!posts?.length" class="py-6 text-center text-gray-400">Trash kosong.</li>
-        </ul>
-      </UCard>
-    </main>
+    <UCard :ui="{ body: 'p-0 sm:p-0' }">
+      <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+        <li v-for="post in posts" :key="post.id" class="py-3 px-4 flex items-center justify-between gap-4">
+          <span class="font-medium text-slate-900 dark:text-white truncate">{{ post.title || "(Tanpa judul)" }}</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <UButton size="xs" variant="outline" icon="i-lucide-rotate-ccw" @click="onUntrash(post.id)">Pulihkan</UButton>
+            <UButton size="xs" color="error" variant="ghost" icon="i-lucide-trash-2" @click="onDelete(post.id)">
+              Hapus Permanen
+            </UButton>
+          </div>
+        </li>
+        <li v-if="!posts?.length" class="py-12 text-center text-slate-400">
+          <UIcon name="i-lucide-trash-2" class="size-8 mx-auto mb-2 text-slate-300" />
+          Trash kosong.
+        </li>
+      </ul>
+    </UCard>
   </div>
 </template>

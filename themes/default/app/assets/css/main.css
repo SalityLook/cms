@@ -1,2 +1,21 @@
 @import "tailwindcss";
 @import "@selftaught/tailwind-config/theme.css";
+@plugin "@tailwindcss/typography";
+
+/* Editorial article typography (used with `class="prose"` around
+   BlockRenderer output) — brand-tinted links/quotes, serif headings,
+   comfortable measure. Tailwind's `prose` targets plain HTML tags, which is
+   exactly what BlockRenderer's per-block components render, so it "just
+   works" over block content without any special-casing. */
+.prose {
+  --tw-prose-headings: var(--color-slate-900);
+  --tw-prose-links: var(--color-brand-700);
+  --tw-prose-bold: var(--color-slate-900);
+  --tw-prose-quotes: var(--color-slate-700);
+  --tw-prose-quote-borders: var(--color-brand-300);
+  --tw-prose-code: var(--color-brand-700);
+}
+.prose :where(h1, h2, h3, h4) {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}

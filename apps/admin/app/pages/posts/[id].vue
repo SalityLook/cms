@@ -36,6 +36,14 @@ const seoOgImageId = ref<string | null>(seo.value?.ogImageMediaId ?? null);
 const seoCanonicalUrl = ref(seo.value?.canonicalUrl ?? "");
 const seoNoindex = ref(seo.value?.noindex ?? false);
 
+const statusColor: Record<string, "neutral" | "success" | "warning" | "info" | "error"> = {
+  draft: "neutral",
+  published: "success",
+  pending: "warning",
+  scheduled: "info",
+  trashed: "error"
+};
+
 function toggleTerm(termId: string) {
   const idx = selectedTermIds.value.indexOf(termId);
   if (idx === -1) {
@@ -116,171 +124,195 @@ async function onDelete() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between flex-wrap gap-2">
-      <div class="flex items-center gap-3">
-        <NuxtLink to="/posts" class="font-semibold">Posts</NuxtLink>
-        <span class="text-gray-400">/</span>
-        <span>{{ post?.title }}</span>
-        <UBadge variant="subtle">{{ post?.status }}</UBadge>
+  <div>
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between mb-6">
+      <div class="min-w-0">
+        <div class="flex items-center gap-2 text-sm text-slate-400 mb-1">
+          <NuxtLink to="/posts" class="hover:text-slate-600 dark:hover:text-slate-300">Posts</NuxtLink>
+          <UIcon name="i-lucide-chevron-right" class="size-3.5" />
+        </div>
+        <div class="flex items-center gap-2 min-w-0">
+          <h1 class="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 dark:text-white truncate">
+            {{ post?.title || "(Tanpa judul)" }}
+          </h1>
+          <UBadge :color="statusColor[post?.status ?? 'draft']" variant="subtle" class="shrink-0">{{ post?.status }}</UBadge>
+        </div>
       </div>
 
-      <div v-if="post?.status === 'trashed'" class="flex items-center gap-2">
-        <UButton color="neutral" variant="outline" @click="onUntrash">Pulihkan</UButton>
-        <UButton color="error" @click="onDelete">Hapus Permanen</UButton>
+      <div v-if="post?.status === 'trashed'" class="flex items-center gap-2 shrink-0">
+        <UButton color="neutral" variant="outline" icon="i-lucide-rotate-ccw" @click="onUntrash">Pulihkan</UButton>
+        <UButton color="error" icon="i-lucide-trash-2" @click="onDelete">Hapus Permanen</UButton>
       </div>
-      <div v-else class="flex items-center gap-2 flex-wrap">
-        <UButton variant="ghost" :loading="saving" @click="onSave">Simpan</UButton>
+      <div v-else class="flex items-center gap-2 flex-wrap shrink-0">
+        <UButton variant="ghost" color="neutral" :loading="saving" icon="i-lucide-save" @click="onSave">Simpan</UButton>
 
         <UButton v-if="post?.status === 'draft'" color="neutral" variant="outline" @click="onSubmit">Ajukan Review</UButton>
         <UButton v-if="post?.status === 'pending'" color="neutral" variant="outline" @click="onUnpublish">Kembalikan ke Draft</UButton>
         <UButton v-if="post?.status === 'scheduled'" color="neutral" variant="outline" @click="onUnpublish">Batalkan Jadwal</UButton>
 
-        <UButton v-if="post?.status !== 'published'" color="success" @click="onPublish">
-          {{ post?.status === "scheduled" ? "Publish Sekarang" : "Publish" }}
-        </UButton>
-        <UButton v-else color="neutral" variant="outline" @click="onUnpublish">Batalkan Publish</UButton>
-
         <UButton
           v-if="post?.status === 'draft' || post?.status === 'pending'"
           color="neutral"
           variant="outline"
+          icon="i-lucide-calendar-clock"
           @click="showScheduleInput = !showScheduleInput"
         >
           Jadwalkan
         </UButton>
 
-        <UButton color="error" variant="ghost" @click="onTrash">Pindah ke Trash</UButton>
-      </div>
-    </header>
+        <UButton v-if="post?.status !== 'published'" color="success" icon="i-lucide-send" @click="onPublish">
+          {{ post?.status === "scheduled" ? "Publish Sekarang" : "Publish" }}
+        </UButton>
+        <UButton v-else color="neutral" variant="outline" @click="onUnpublish">Batalkan Publish</UButton>
 
-    <div v-if="showScheduleInput" class="border-b border-gray-200 dark:border-gray-800 px-6 py-3 flex items-center gap-2">
-      <input v-model="scheduledAt" type="datetime-local" class="border border-gray-300 dark:border-gray-700 rounded-md px-2 py-1 bg-transparent" >
-      <UButton size="sm" @click="onConfirmSchedule">Konfirmasi Jadwal</UButton>
+        <UButton color="error" variant="ghost" icon="i-lucide-trash-2" @click="onTrash" />
+      </div>
     </div>
 
-    <main class="p-6 max-w-3xl mx-auto space-y-4">
-      <UCard>
-        <div class="space-y-4">
-          <UFormField label="Judul">
-            <UInput v-model="title" class="w-full" />
-          </UFormField>
-          <UFormField label="Slug">
-            <UInput v-model="slug" class="w-full" />
-          </UFormField>
-          <UFormField label="Ringkasan (opsional)">
-            <UTextarea v-model="excerpt" class="w-full" :rows="2" />
-          </UFormField>
-        </div>
-      </UCard>
+    <UCard v-if="showScheduleInput" class="mb-6">
+      <div class="flex flex-col sm:flex-row sm:items-end gap-3">
+        <UFormField label="Jadwalkan publikasi" class="flex-1">
+          <UInput v-model="scheduledAt" type="datetime-local" class="w-full" />
+        </UFormField>
+        <UButton icon="i-lucide-check" @click="onConfirmSchedule">Konfirmasi Jadwal</UButton>
+      </div>
+    </UCard>
 
-      <BlockEditor v-model="doc" />
+    <UAlert v-if="error" color="error" variant="subtle" :title="error" class="mb-6" />
 
-      <UCard>
-        <h2 class="font-medium mb-3">Gambar Unggulan</h2>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="item in mediaItems"
-            :key="item.id"
-            type="button"
-            class="border-2 rounded-md overflow-hidden"
-            :class="featuredMediaId === item.id ? 'border-primary' : 'border-transparent'"
-            @click="featuredMediaId = featuredMediaId === item.id ? null : item.id"
-          >
-            <img :src="item.url" :alt="item.altText ?? ''" class="w-16 h-16 object-cover">
-          </button>
-          <p v-if="!mediaItems?.length" class="text-gray-400 text-sm">
-            Belum ada media. Upload dulu di halaman <NuxtLink to="/media" class="underline">Media</NuxtLink>.
-          </p>
-        </div>
-      </UCard>
-
-      <UCard>
-        <h2 class="font-medium mb-3">Categories</h2>
-        <div class="flex flex-wrap gap-2 mb-4">
-          <UButton
-            v-for="cat in categories"
-            :key="cat.id"
-            size="xs"
-            :color="selectedTermIds.includes(cat.id) ? 'primary' : 'neutral'"
-            :variant="selectedTermIds.includes(cat.id) ? 'solid' : 'outline'"
-            @click="toggleTerm(cat.id)"
-          >
-            {{ cat.name }}
-          </UButton>
-          <p v-if="!categories?.length" class="text-gray-400 text-sm">
-            Belum ada category. Buat di halaman <NuxtLink to="/categories" class="underline">Categories</NuxtLink>.
-          </p>
-        </div>
-
-        <h2 class="font-medium mb-3">Tags</h2>
-        <div class="flex flex-wrap gap-2">
-          <UButton
-            v-for="tag in tags"
-            :key="tag.id"
-            size="xs"
-            :color="selectedTermIds.includes(tag.id) ? 'primary' : 'neutral'"
-            :variant="selectedTermIds.includes(tag.id) ? 'solid' : 'outline'"
-            @click="toggleTerm(tag.id)"
-          >
-            {{ tag.name }}
-          </UButton>
-          <p v-if="!tags?.length" class="text-gray-400 text-sm">
-            Belum ada tag. Buat di halaman <NuxtLink to="/tags" class="underline">Tags</NuxtLink>.
-          </p>
-        </div>
-      </UCard>
-
-      <UCard>
-        <h2 class="font-medium mb-3">SEO</h2>
-        <div class="space-y-4">
-          <UFormField label="SEO Title (opsional, fallback ke Judul)">
-            <UInput v-model="seoTitle" class="w-full" />
-          </UFormField>
-          <UFormField label="Meta Description (opsional, fallback ke Ringkasan)">
-            <UTextarea v-model="seoDescription" class="w-full" :rows="2" />
-          </UFormField>
-          <UFormField label="Canonical URL (opsional)">
-            <UInput v-model="seoCanonicalUrl" class="w-full" placeholder="https://..." />
-          </UFormField>
-          <div>
-            <p class="text-sm font-medium mb-2">OG Image (opsional, fallback ke Gambar Unggulan)</p>
-            <div class="flex flex-wrap gap-2">
-              <button
-                v-for="item in mediaItems"
-                :key="item.id"
-                type="button"
-                class="border-2 rounded-md overflow-hidden"
-                :class="seoOgImageId === item.id ? 'border-primary' : 'border-transparent'"
-                @click="seoOgImageId = seoOgImageId === item.id ? null : item.id"
-              >
-                <img :src="item.url" :alt="item.altText ?? ''" class="w-12 h-12 object-cover">
-              </button>
-            </div>
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Main column -->
+      <div class="lg:col-span-2 space-y-4 min-w-0">
+        <UCard>
+          <div class="space-y-4">
+            <UFormField label="Judul">
+              <UInput v-model="title" class="w-full" size="lg" />
+            </UFormField>
+            <UFormField label="Slug">
+              <UInput v-model="slug" class="w-full" />
+            </UFormField>
+            <UFormField label="Ringkasan (opsional)">
+              <UTextarea v-model="excerpt" class="w-full" :rows="2" />
+            </UFormField>
           </div>
-          <label class="flex items-center gap-2 text-sm">
-            <input v-model="seoNoindex" type="checkbox">
-            Noindex (sembunyikan dari mesin pencari)
-          </label>
-        </div>
-      </UCard>
+        </UCard>
 
-      <UCard>
-        <h2 class="font-medium mb-3">Revisions</h2>
-        <ul class="divide-y divide-gray-100 dark:divide-gray-900">
-          <li v-for="rev in revisions" :key="rev.id" class="py-2 flex items-center justify-between">
-            <span class="text-sm">{{ rev.title }} — {{ new Date(rev.createdAt).toLocaleString() }}</span>
-            <UButton size="xs" variant="outline" @click="onRestoreRevision(rev.id)">Pulihkan versi ini</UButton>
-          </li>
-          <li v-if="!revisions?.length" class="py-4 text-center text-gray-400 text-sm">Belum ada revisi tersimpan.</li>
-        </ul>
-      </UCard>
+        <BlockEditor v-model="doc" />
 
-      <UCard v-for="(panel, i) in editorPanels" :key="i">
-        <component :is="panel" :content-id="id" />
-      </UCard>
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold text-slate-900 dark:text-white text-sm">SEO</h2>
+          </template>
+          <div class="space-y-4">
+            <UFormField label="SEO Title (opsional, fallback ke Judul)">
+              <UInput v-model="seoTitle" class="w-full" />
+            </UFormField>
+            <UFormField label="Meta Description (opsional, fallback ke Ringkasan)">
+              <UTextarea v-model="seoDescription" class="w-full" :rows="2" />
+            </UFormField>
+            <UFormField label="Canonical URL (opsional)">
+              <UInput v-model="seoCanonicalUrl" class="w-full" placeholder="https://..." />
+            </UFormField>
+            <div>
+              <p class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">OG Image (opsional, fallback ke Gambar Unggulan)</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="item in mediaItems"
+                  :key="item.id"
+                  type="button"
+                  class="border-2 rounded-lg overflow-hidden transition-colors"
+                  :class="seoOgImageId === item.id ? 'border-brand-500' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-700'"
+                  @click="seoOgImageId = seoOgImageId === item.id ? null : item.id"
+                >
+                  <img :src="item.url" :alt="item.altText ?? ''" class="w-12 h-12 object-cover">
+                </button>
+              </div>
+            </div>
+            <USwitch v-model="seoNoindex" label="Noindex (sembunyikan dari mesin pencari)" />
+          </div>
+        </UCard>
 
-      <p v-if="error" class="text-sm text-red-500">{{ error }}</p>
-    </main>
+        <UCard v-for="(panel, i) in editorPanels" :key="i">
+          <component :is="panel" :content-id="id" />
+        </UCard>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="space-y-4 min-w-0">
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Gambar Unggulan</h2>
+          </template>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-for="item in mediaItems"
+              :key="item.id"
+              type="button"
+              class="border-2 rounded-lg overflow-hidden transition-colors"
+              :class="featuredMediaId === item.id ? 'border-brand-500' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-700'"
+              @click="featuredMediaId = featuredMediaId === item.id ? null : item.id"
+            >
+              <img :src="item.url" :alt="item.altText ?? ''" class="w-16 h-16 object-cover">
+            </button>
+            <p v-if="!mediaItems?.length" class="text-slate-400 text-sm">
+              Belum ada media. Upload dulu di halaman <NuxtLink to="/media" class="underline">Media</NuxtLink>.
+            </p>
+          </div>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Categories</h2>
+          </template>
+          <div class="flex flex-wrap gap-2 mb-5">
+            <UButton
+              v-for="cat in categories"
+              :key="cat.id"
+              size="xs"
+              :color="selectedTermIds.includes(cat.id) ? 'primary' : 'neutral'"
+              :variant="selectedTermIds.includes(cat.id) ? 'solid' : 'outline'"
+              @click="toggleTerm(cat.id)"
+            >
+              {{ cat.name }}
+            </UButton>
+            <p v-if="!categories?.length" class="text-slate-400 text-sm">
+              Belum ada category. Buat di halaman <NuxtLink to="/categories" class="underline">Categories</NuxtLink>.
+            </p>
+          </div>
+
+          <template #footer>
+            <h2 class="font-semibold text-slate-900 dark:text-white text-sm mb-3">Tags</h2>
+            <div class="flex flex-wrap gap-2">
+              <UButton
+                v-for="tag in tags"
+                :key="tag.id"
+                size="xs"
+                :color="selectedTermIds.includes(tag.id) ? 'primary' : 'neutral'"
+                :variant="selectedTermIds.includes(tag.id) ? 'solid' : 'outline'"
+                @click="toggleTerm(tag.id)"
+              >
+                {{ tag.name }}
+              </UButton>
+              <p v-if="!tags?.length" class="text-slate-400 text-sm">
+                Belum ada tag. Buat di halaman <NuxtLink to="/tags" class="underline">Tags</NuxtLink>.
+              </p>
+            </div>
+          </template>
+        </UCard>
+
+        <UCard>
+          <template #header>
+            <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Revisions</h2>
+          </template>
+          <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+            <li v-for="rev in revisions" :key="rev.id" class="py-2.5 flex items-center justify-between gap-2">
+              <span class="text-xs text-slate-500 truncate">{{ rev.title }} — {{ new Date(rev.createdAt).toLocaleString() }}</span>
+              <UButton size="xs" variant="outline" class="shrink-0" @click="onRestoreRevision(rev.id)">Pulihkan</UButton>
+            </li>
+            <li v-if="!revisions?.length" class="py-4 text-center text-slate-400 text-sm">Belum ada revisi tersimpan.</li>
+          </ul>
+        </UCard>
+      </div>
+    </div>
   </div>
 </template>

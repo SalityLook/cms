@@ -27,19 +27,18 @@ async function onSave() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <NuxtLink to="/" class="font-semibold">SelfTaught CMS</NuxtLink>
-        <span class="text-gray-400">/</span>
-        <span>Settings</span>
-      </div>
-      <UButton :loading="saving" @click="onSave">Simpan</UButton>
-    </header>
+  <div>
+    <PageHeader title="Settings">
+      <template #actions>
+        <UButton :loading="saving" icon="i-lucide-check" @click="onSave">Simpan</UButton>
+      </template>
+    </PageHeader>
 
-    <main class="p-6 max-w-2xl mx-auto space-y-4">
+    <div class="max-w-2xl space-y-4">
       <UCard>
-        <h2 class="font-medium mb-3">General</h2>
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">General</h2>
+        </template>
         <div class="space-y-4">
           <UFormField label="Nama Situs">
             <UInput v-model="siteName" class="w-full" />
@@ -51,25 +50,25 @@ async function onSave() {
       </UCard>
 
       <UCard>
-        <h2 class="font-medium mb-3">SEO Default</h2>
-        <p class="text-sm font-medium mb-2">Default OG Image</p>
-        <div class="flex flex-wrap gap-2 mb-4">
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">SEO Default</h2>
+        </template>
+        <p class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Default OG Image</p>
+        <div class="flex flex-wrap gap-2 mb-5">
           <button
             v-for="item in mediaItems"
             :key="item.id"
             type="button"
-            class="border-2 rounded-md overflow-hidden"
-            :class="defaultOgImageMediaId === item.id ? 'border-primary' : 'border-transparent'"
+            class="border-2 rounded-lg overflow-hidden transition-colors"
+            :class="defaultOgImageMediaId === item.id ? 'border-brand-500' : 'border-transparent hover:border-slate-300 dark:hover:border-slate-700'"
             @click="defaultOgImageMediaId = defaultOgImageMediaId === item.id ? null : item.id"
           >
-            <img :src="item.url" :alt="item.altText ?? ''" class="w-12 h-12 object-cover">
+            <img :src="item.url" :alt="item.altText ?? ''" class="w-14 h-14 object-cover">
           </button>
+          <p v-if="!mediaItems?.length" class="text-sm text-slate-400">Belum ada media.</p>
         </div>
-        <label class="flex items-center gap-2 text-sm">
-          <input v-model="discourageSearchEngines" type="checkbox">
-          Cegah mesin pencari mengindeks situs ini (robots.txt disallow all)
-        </label>
+        <USwitch v-model="discourageSearchEngines" label="Cegah mesin pencari mengindeks situs ini (robots.txt disallow all)" />
       </UCard>
-    </main>
+    </div>
   </div>
 </template>

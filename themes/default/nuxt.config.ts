@@ -13,7 +13,14 @@ const { resolve } = createResolver(import.meta.url);
 // not this layer's own — createResolver(import.meta.url) is the documented
 // way to reference a layer's own files from its own nuxt.config.ts.
 export default defineNuxtConfig({
+  modules: ["@nuxt/fonts"],
   css: [resolve("./app/assets/css/main.css")],
+  fonts: {
+    families: [
+      { name: "Inter", provider: "google", weights: [400, 500, 600, 700] },
+      { name: "Lora", provider: "google", weights: [500, 600, 700] }
+    ]
+  },
   vite: {
     plugins: [tailwindcss()]
   }

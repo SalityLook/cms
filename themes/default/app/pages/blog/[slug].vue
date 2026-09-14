@@ -14,6 +14,10 @@ if (!post.value) {
 const doc = computed(() => post.value!.content as ContentDocument);
 const categories = computed(() => post.value?.terms.filter((term) => term.taxonomy === "category") ?? []);
 const tags = computed(() => post.value?.terms.filter((term) => term.taxonomy === "tag") ?? []);
+const publishedLabel = computed(() => {
+  const date = post.value?.publishedAt ?? post.value?.createdAt;
+  return date ? new Date(date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "";
+});
 
 useSeoMeta({
   title: post.value.seo.title,
@@ -36,22 +40,44 @@ useHead({
 </script>
 
 <template>
-  <article class="max-w-2xl mx-auto px-4 py-12 prose dark:prose-invert">
-    <img v-if="post?.featuredMediaUrl" :src="post.featuredMediaUrl" alt="" class="rounded-md" >
-    <h1>{{ post?.title }}</h1>
+  <article>
+    <header class="max-w-3xl mx-auto px-4 sm:px-6 pt-12 sm:pt-16 pb-8 text-center">
+      <div v-if="categories.length" class="flex justify-center gap-2 mb-4">
+        <NuxtLink
+          v-for="cat in categories"
+          :key="cat.id"
+          :to="`/category/${cat.slug}`"
+          class="text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide hover:underline"
+        >
+          {{ cat.name }}
+        </NuxtLink>
+      </div>
+      <h1 class="font-serif text-3xl sm:text-5xl font-semibold tracking-tight text-slate-900 dark:text-white leading-tight">
+        {{ post?.title }}
+      </h1>
+      <p v-if="post?.excerpt" class="mt-4 text-lg text-slate-500 dark:text-slate-400">{{ post.excerpt }}</p>
+      <time class="mt-6 block text-sm text-slate-400">{{ publishedLabel }}</time>
+    </header>
 
-    <div v-if="categories.length" class="not-prose flex gap-2 text-sm mb-2">
-      <NuxtLink v-for="cat in categories" :key="cat.id" :to="`/category/${cat.slug}`" class="text-primary hover:underline">
-        {{ cat.name }}
-      </NuxtLink>
+    <div v-if="post?.featuredMediaUrl" class="max-w-4xl mx-auto px-4 sm:px-6 mb-10">
+      <img :src="post.featuredMediaUrl" :alt="post.title" class="w-full rounded-2xl object-cover aspect-[16/9]" >
     </div>
 
-    <BlockRenderer v-for="(node, i) in doc.content" :key="i" :node="node" />
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 pb-16">
+      <div class="prose prose-slate dark:prose-invert prose-lg max-w-none">
+        <BlockRenderer v-for="(node, i) in doc.content" :key="i" :node="node" />
+      </div>
 
-    <div v-if="tags.length" class="not-prose flex gap-2 text-sm mt-6">
-      <NuxtLink v-for="tag in tags" :key="tag.id" :to="`/tag/${tag.slug}`" class="text-gray-500 hover:underline">
-        #{{ tag.name }}
-      </NuxtLink>
+      <div v-if="tags.length" class="flex flex-wrap gap-2 mt-12 pt-8 border-t border-slate-200 dark:border-slate-800">
+        <NuxtLink
+          v-for="tag in tags"
+          :key="tag.id"
+          :to="`/tag/${tag.slug}`"
+          class="text-xs font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-900 rounded-full px-3 py-1 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
+        >
+          #{{ tag.name }}
+        </NuxtLink>
+      </div>
     </div>
   </article>
 </template>

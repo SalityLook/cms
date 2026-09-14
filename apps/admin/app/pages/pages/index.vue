@@ -15,42 +15,48 @@ const statusColor: Record<string, "neutral" | "success" | "warning" | "info" | "
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-950">
-    <header class="border-b border-gray-200 dark:border-gray-800 px-6 py-4 flex items-center justify-between">
-      <div class="flex items-center gap-3">
-        <NuxtLink to="/" class="font-semibold">SelfTaught CMS</NuxtLink>
-        <span class="text-gray-400">/</span>
-        <span>Pages</span>
-      </div>
-      <UButton to="/pages/new" size="sm">Page Baru</UButton>
-    </header>
+  <div>
+    <PageHeader title="Pages" :description="`${visiblePages.length} page`">
+      <template #actions>
+        <UButton to="/pages/new" icon="i-lucide-plus">Page Baru</UButton>
+      </template>
+    </PageHeader>
 
-    <main class="p-6">
-      <UCard>
+    <UCard :ui="{ body: 'p-0 sm:p-0' }">
+      <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead>
-            <tr class="text-left border-b border-gray-200 dark:border-gray-800">
-              <th class="py-2 font-medium">Judul</th>
-              <th class="py-2 font-medium">Status</th>
-              <th class="py-2 font-medium">Diperbarui</th>
+            <tr class="text-left border-b border-slate-200 dark:border-slate-800">
+              <th class="py-3 px-4 font-medium text-slate-500">Judul</th>
+              <th class="py-3 px-4 font-medium text-slate-500">Status</th>
+              <th class="py-3 px-4 font-medium text-slate-500">Diperbarui</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="page in visiblePages" :key="page.id" class="border-b border-gray-100 dark:border-gray-900">
-              <td class="py-2">
-                <NuxtLink :to="`/pages/${page.id}`" class="text-primary hover:underline">{{ page.title }}</NuxtLink>
+            <tr
+              v-for="page in visiblePages"
+              :key="page.id"
+              class="border-b border-slate-100 dark:border-slate-800/60 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+            >
+              <td class="py-3 px-4">
+                <NuxtLink :to="`/pages/${page.id}`" class="font-medium text-slate-900 dark:text-white hover:text-brand-600 dark:hover:text-brand-400">
+                  {{ page.title || "(Tanpa judul)" }}
+                </NuxtLink>
               </td>
-              <td class="py-2">
+              <td class="py-3 px-4">
                 <UBadge :color="statusColor[page.status] ?? 'neutral'" variant="subtle">{{ page.status }}</UBadge>
               </td>
-              <td class="py-2 text-gray-500">{{ new Date(page.updatedAt).toLocaleString() }}</td>
+              <td class="py-3 px-4 text-slate-500">{{ new Date(page.updatedAt).toLocaleString() }}</td>
             </tr>
             <tr v-if="!visiblePages.length">
-              <td colspan="3" class="py-6 text-center text-gray-400">Belum ada page.</td>
+              <td colspan="3" class="py-12 text-center text-slate-400">
+                <UIcon name="i-lucide-file" class="size-8 mx-auto mb-2 text-slate-300" />
+                Belum ada page.
+              </td>
             </tr>
           </tbody>
         </table>
-      </UCard>
-    </main>
+      </div>
+    </UCard>
   </div>
 </template>
