@@ -5,6 +5,7 @@ definePageMeta({ middleware: "auth" });
 
 const route = useRoute();
 const id = route.params.id as string;
+const editorPanels = adminUIRegistry.getEditorPanels("page");
 
 const { data: page, refresh } = await useApiFetch<PageDetail>(`/api/pages/${id}`);
 
@@ -278,6 +279,10 @@ async function onDelete() {
             </li>
             <li v-if="!revisions?.length" class="py-4 text-center text-slate-400 text-sm">Belum ada revisi tersimpan.</li>
           </ul>
+        </UCard>
+
+        <UCard v-for="(panel, i) in editorPanels" :key="i">
+          <component :is="panel" :content-id="id" />
         </UCard>
       </div>
     </div>

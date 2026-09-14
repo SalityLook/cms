@@ -17,14 +17,19 @@ export class ContentMetaService {
     return Object.fromEntries(rows.map((row) => [row.key, row.value]));
   }
 
+  /**
+   * A real upsert (unique index on (content_id, key), migration 0006) --
+   * this used to be find-then-update/insert, a genuine race condition
+   * under concurrent writes to the same key. See CLAUDE.md Phase 12 notes.
+   */
   async set(contentId: string, key: string, value: unknown): Promise<void> {
-    const existing = await this.db.query.contentMeta.findFirst({
-      where: and(eq(contentMeta.contentId, contentId), eq(contentMeta.key, key))
-    });
-    if (existing) {
-      await this.db.update(contentMeta).set({ value }).where(eq(contentMeta.id, existing.id));
-    } else {
-      await this.db.insert(contentMeta).values({ contentId, key, value });
-    }
+    await this.db
+      .insert(contentMeta)
+      .values({ contentId, key, value })
+      .onConflictDoUpdate({ target: [contentMeta.contentId, contentMeta.key], set: { value } });
+  }
+
+  async delete(contentId: string, key: string): Promise<void> {
+    await this.db.delete(contentMeta).where(and(eq(contentMeta.contentId, contentId), eq(contentMeta.key, key)));
   }
 }

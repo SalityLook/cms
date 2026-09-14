@@ -43,6 +43,13 @@
       "when": 1789361264872,
       "tag": "0005_wealthy_rocket_racer",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789365994146,
+      "tag": "0006_flaky_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }

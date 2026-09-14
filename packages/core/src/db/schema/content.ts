@@ -1,7 +1,6 @@
 import { relations } from "drizzle-orm";
 import {
   type AnyPgColumn,
-  index,
   integer,
   jsonb,
   pgEnum,
@@ -58,7 +57,7 @@ export const contentMeta = pgTable(
     key: varchar("key", { length: 100 }).notNull(),
     value: jsonb("value")
   },
-  (table) => [index("content_meta_content_id_key_idx").on(table.contentId, table.key)]
+  (table) => [uniqueIndex("content_meta_content_id_key_idx").on(table.contentId, table.key)]
 );
 
 export const contentRelations = relations(content, ({ one, many }) => ({
