@@ -171,6 +171,15 @@ pnpm test                   # Unit test + integration test (butuh db:migrate + d
 
 ## Deployment produksi
 
+> **Live**: https://self-taught.my.id (publik) / https://admin.self-taught.my.id
+> (dashboard). Deployment ini di VPS **tanpa Docker**, jadi dijalankan lewat
+> jalur native — build Nitro biasa + [pm2](https://pm2.keymetrics.io/) +
+> nginx reverse proxy + certbot, BUKAN `docker-compose.yml` di bawah ini.
+> Detail lengkap (script start, config nginx, cara TLS diterbitkan, backup
+> cron) ada di `CLAUDE.md` bagian "Pekerjaan pasca-roadmap #5". Kalau VPS
+> Anda punya Docker, panduan `docker-compose.yml` di bawah tetap jalur yang
+> lebih simpel.
+
 Repo ini sudah menyediakan `Dockerfile` dan `docker-compose.yml` untuk
 deployment self-hosted:
 
@@ -322,9 +331,11 @@ ke `AdminUIRegistry`.
 
 Semua 8 fase roadmap awal (scaffolding, auth/RBAC, content & block editor,
 taxonomy & media, revisions & publishing workflow, SEO, theme layer, hook/
-plugin system) sudah selesai, ditambah tiga penyempurnaan pasca-roadmap:
-halaman admin Users & Roles, automated test suite, dan CRUD penuh untuk
-content type "page" (termasuk hierarki parent/menu order). Beberapa item
-kecil masih sengaja belum dibangun (static front page homepage, pembuatan
-role custom lewat UI, dsb.) — daftar lengkap beserta cara melanjutkannya ada
-di bagian akhir `CLAUDE.md`.
+plugin system) sudah selesai, ditambah lima penyempurnaan pasca-roadmap:
+halaman admin Users & Roles, automated test suite, CRUD penuh untuk content
+type "page" (termasuk hierarki parent/menu order), production hardening
+(rate limiting, validasi upload, status code presisi, dependency audit,
+CI, backup/restore), dan **deployment produksi live** di
+https://self-taught.my.id. Beberapa item kecil masih sengaja belum dibangun
+(static front page homepage, pembuatan role custom lewat UI, dsb.) — daftar
+lengkap beserta cara melanjutkannya ada di bagian akhir `CLAUDE.md`.
