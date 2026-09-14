@@ -1347,6 +1347,43 @@ child → 400 → hapus child dulu → sukses → assign post ke child, publish 
 Typecheck/lint/test bersih, CSS bundle re-check (Gotcha #21). Deploy kedua
 app — live.
 
+**Catatan proses**: `git add -A -- apps packages` (pathspec dipakai sejak
+awal sesi ini untuk hindari nge-stage file scratch/temp) diam-diam
+TIDAK menyertakan `themes/` — file breadcrumb Phase 11
+(`themes/default/app/pages/category/[slug].vue`) sudah ter-build+deploy
+tapi baru ke-commit belakangan di Phase 12 (lihat commit terpisah "Fix:
+commit the Phase 11 breadcrumb file..."). **Pelajaran**: kalau pakai
+`git add -A -- <pathspec>` yang eksplisit sebut folder, WAJIB cek
+`git status --short` SETELAH staging (bukan cuma sebelum) untuk pastikan
+tidak ada folder lain yang kena skip — atau lebih aman, sebut SEMUA
+top-level folder yang mungkin disentuh (`apps packages themes`) daripada
+subset yang "biasanya" cukup.
+
+### Phase 12 — Custom Fields UI generik di atas `content_meta` (selesai)
+
+Fix race condition dulu: `content_meta` tidak punya unique constraint di
+`(content_id, key)`, `set()` sebelumnya find-then-update/insert (2 write
+concurrent ke key baru bisa keduanya insert, jadi 2 row). Migration `0006`
+tambah unique index, `set()` ditulis ulang `onConflictDoUpdate` (pattern
+sama `SettingsService.set()`). `delete(contentId, key)` baru ditambah.
+
+Fitur: `CustomFieldsPanel.vue` (add/edit/delete key-value, best-effort
+JSON.parse saat simpan) didaftarkan untuk "post" DAN "page" lewat
+`app/plugins/register-core-editor-panels.ts` baru — SENGAJA terpisah dari
+`app/plugins/load-plugins.ts` (loader plugin PIHAK KETIGA) supaya tidak
+mengesankan panel core ini bisa di-toggle kayak plugin. `pages/[id].vue`
+sebelumnya TIDAK PUNYA blok render editor panel sama sekali (Phase 3 page
+CRUD tidak pernah wiring ini karena example-plugin cuma target "post") —
+ditambahkan sekarang. Endpoint `GET/PUT/DELETE /api/pages/[id]/meta` baru
+(post sudah ada sejak Phase 7, page belum pernah).
+
+**Diverifikasi runtime**: tambah field via panel generik → round-trip
+benar → hapus → panel `example-plugin` (key beda, tabel sama) tidak
+terpengaruh → **2 PUT concurrent ke key BARU yang sama → cuma 1 row
+tersisa** (bukti nyata upsert fix, bukan cuma "compile lolos") → SSR panel
+render di post DAN page editor → cleanup total (`content_meta` cascade
+ikut terhapus). Typecheck/lint/test bersih. Deploy admin — live.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
