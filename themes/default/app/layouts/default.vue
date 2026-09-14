@@ -19,9 +19,8 @@ const navLinks = [
   <div class="min-h-screen flex flex-col bg-white dark:bg-slate-950">
     <header class="sticky top-0 z-40 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <NuxtLink to="/" class="flex items-center gap-2 font-semibold text-slate-900 dark:text-white">
-          <span class="size-7 rounded-lg bg-brand-600 text-white flex items-center justify-center text-sm font-bold">S</span>
-          <span class="tracking-tight">SelfTaught</span>
+        <NuxtLink to="/" class="flex items-center">
+          <img src="/brand/wordmark.png" alt="SelfTaught" class="h-6 w-auto">
         </NuxtLink>
 
         <nav class="hidden sm:flex items-center gap-8">

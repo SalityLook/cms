@@ -47,7 +47,7 @@ useHead({
           v-for="cat in categories"
           :key="cat.id"
           :to="`/category/${cat.slug}`"
-          class="text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide hover:underline"
+          class="text-xs font-semibold text-accent-600 dark:text-accent-400 uppercase tracking-wide hover:underline"
         >
           {{ cat.name }}
         </NuxtLink>

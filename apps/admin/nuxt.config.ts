@@ -4,6 +4,12 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ["@nuxt/ui", "nuxt-auth-utils", "@nuxt/eslint", "@nuxt/fonts"],
   css: ["~/assets/css/main.css"],
+  app: {
+    head: {
+      title: "SelfTaught CMS",
+      link: [{ rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" }]
+    }
+  },
   fonts: {
     families: [{ name: "Inter", provider: "google", weights: [400, 500, 600, 700] }]
   },

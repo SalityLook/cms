@@ -11,7 +11,7 @@ if (!data.value) {
 
 <template>
   <div class="max-w-5xl mx-auto px-4 sm:px-6 py-12 sm:py-16">
-    <p class="text-sm font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-2">Kategori</p>
+    <p class="text-sm font-semibold text-accent-600 dark:text-accent-400 uppercase tracking-wide mb-2">Kategori</p>
     <h1 class="font-serif text-3xl sm:text-4xl font-semibold tracking-tight text-slate-900 dark:text-white mb-10">
       {{ data?.term.name }}
     </h1>

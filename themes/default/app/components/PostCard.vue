@@ -37,7 +37,7 @@ function formatDate(value: string) {
     <NuxtLink
       v-if="post.categories?.[0]"
       :to="`/category/${post.categories[0].slug}`"
-      class="inline-block text-xs font-semibold text-brand-600 dark:text-brand-400 uppercase tracking-wide mb-2 hover:underline"
+      class="inline-block text-xs font-semibold text-accent-600 dark:text-accent-400 uppercase tracking-wide mb-2 hover:underline"
     >
       {{ post.categories[0].name }}
     </NuxtLink>

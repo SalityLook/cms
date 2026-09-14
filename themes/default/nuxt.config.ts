@@ -15,6 +15,11 @@ const { resolve } = createResolver(import.meta.url);
 export default defineNuxtConfig({
   modules: ["@nuxt/fonts"],
   css: [resolve("./app/assets/css/main.css")],
+  app: {
+    head: {
+      link: [{ rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" }]
+    }
+  },
   fonts: {
     families: [
       { name: "Inter", provider: "google", weights: [400, 500, 600, 700] },
