@@ -1,6 +1,6 @@
 import { taxonomyService } from "@selftaught/core/server";
 
-export default defineEventHandler(async (event) => {
+export default defineApiHandler(async (event) => {
   requireCapability(event, "manage_categories");
   const id = getRouterParam(event, "id");
   if (!id) {

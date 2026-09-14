@@ -86,6 +86,17 @@ export interface TermSummary {
   name: string;
 }
 
+export interface TermTreeNode {
+  id: string;
+  taxonomy: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  parentId: string | null;
+  createdAt: string;
+  children: TermTreeNode[];
+}
+
 export type ContentStatus = "draft" | "pending" | "scheduled" | "published" | "trashed";
 
 export interface PostSummary {

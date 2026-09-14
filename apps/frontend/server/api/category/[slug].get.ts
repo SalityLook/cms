@@ -11,9 +11,13 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: "Category not found" });
   }
 
-  const contentIds = await taxonomyService.contentIdsForTerm(term.id);
+  const [contentIds, ancestors, children] = await Promise.all([
+    taxonomyService.contentIdsForTerm(term.id),
+    taxonomyService.getAncestors(term.id),
+    taxonomyService.listChildren(term.id)
+  ]);
   const published = await contentService.list({ type: "post", status: "published" });
   const posts = await enrichPostsForCards(published.filter((post) => contentIds.includes(post.id)));
 
-  return { term, posts };
+  return { term, posts, ancestors, children };
 });
