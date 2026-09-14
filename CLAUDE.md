@@ -15,10 +15,10 @@ gotcha yang sudah ditemukan, supaya pekerjaan bisa lanjut tanpa internet dan
 tanpa perlu re-derive keputusan yang sudah diambil.
 
 **STATUS: semua 8 fase (Phase 0-7) dari roadmap awal sudah selesai dan
-ter-commit, ditambah 6 putaran pasca-roadmap** (Users & Roles admin UI,
+ter-commit, ditambah 7 putaran pasca-roadmap** (Users & Roles admin UI,
 automated tests, CRUD content type "page", production hardening,
-**deployment produksi live**, dan **UI/UX redesign penuh** — lihat
-"Pekerjaan pasca-roadmap #1-6" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
+**deployment produksi live**, **UI/UX redesign penuh**, dan **brand
+logo/warna asli** — lihat "Pekerjaan pasca-roadmap #1-7" di bawah). CMS ini punya: auth+RBAC, content CRUD lengkap (post & page) dengan
 block editor, taxonomies, media library, revisions, publishing workflow
 penuh (draft/pending/scheduled/published/trashed + cron auto-publish), SEO
 subsystem, theme layer yang swappable, hook/plugin system dengan contoh
@@ -1112,6 +1112,45 @@ cleanup total. `pnpm test` tetap 29/29. Kedua app di-build ulang untuk
 produksi dan di-deploy via `pm2 restart` — dikonfirmasi live di
 `https://self-taught.my.id`/`https://admin.self-taught.my.id`, dan site
 lain di VPS ini tidak terganggu.
+
+## Pekerjaan pasca-roadmap #7: Brand logo & warna asli (selesai)
+
+User kasih `brand/selftaught-logo-source.png` (logo asli "{Self-Taught}",
+biru/oranye di atas hitam, tagline "Teachers Are Everywhere") untuk
+menggantikan badge "S" + palet indigo placeholder yang dipakai di Pekerjaan
+#6.
+
+- **Asset diproses pakai ImageMagick** (`convert`, tersedia di VPS ini) —
+  trim padding hitam, key-out background hitam jadi transparan
+  (`-transparent black`), recolor satu-satunya elemen putih (garis pemisah
+  "Self"–"Taught") ke abu-abu netral supaya tetap kelihatan di background
+  terang MAUPUN gelap (versi asli cuma legible di gelap). Hasil: 3 file
+  turunan, digandakan ke `public/` KEDUA app (admin dan theme, karena
+  keduanya build Nuxt terpisah):
+  - `brand/wordmark.png` — "{Self-Taught}" tanpa tagline, dipakai di
+    semua nav/sidebar/header yang sebelumnya pakai badge "S" buatan sendiri.
+  - `brand/mark.png` — cuma dua kurung kurawal "{ }" (crop dari kedua ujung
+    wordmark, disusun ulang berdekatan) — dipakai sebagai source
+    favicon/apple-touch-icon, legible bahkan di 32px.
+  - `brand/full-lockup.png` (admin saja) — wordmark+tagline, dipakai di
+    panel branding gelap halaman login.
+- **Design token warna diganti dari indigo placeholder ke warna logo asli**
+  disampling langsung dari source PNG: `--color-brand-*` sekarang scale
+  biru penuh anchor `#0284FF` (bukan lagi oklch, plain hex tint/shade
+  blend), plus scale baru `--color-accent-*` (oranye `#FF7D01`) dipakai
+  TERBATAS untuk badge/label kategori (`PostCard`, `blog/[slug]`,
+  `category/[slug]`) supaya identitas dua-warna logo kerasa tanpa bikin UI
+  ramai — tag tetap brand-blue biar dua taxonomy kebaca beda secara visual.
+- `favicon.ico` (multi-size 16/32/48) dan `apple-touch-icon.png` (180x180)
+  di-generate ulang dari `brand/mark.png`, menggantikan favicon default
+  bawaan `nuxi init`.
+
+**Diverifikasi runtime**: typecheck+lint bersih di kedua app, dev server di
+port non-produksi (bukan 3000/3001 — lihat peringatan soal ini di
+Pekerjaan #6) balikin `/brand/wordmark.png`+`/favicon.ico` 200, HTML hasil
+SSR benar-benar memuat tag `<img>` baru + teks tagline asli. `pnpm test`
+tetap 29/29. Build ulang + `pm2 restart` — dikonfirmasi live di kedua
+domain produksi.
 
 ## Git
 
