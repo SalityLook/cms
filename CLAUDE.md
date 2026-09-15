@@ -1848,6 +1848,68 @@ bersih di core/admin, `pnpm test` 29/29. Build+deploy **admin saja**
 (`pm2 restart selftaught-admin` — frontend/theme tidak disentuh fase
 ini), live, tenant lain tidak terganggu.
 
+### Phase 22 — Two-factor authentication (TOTP) (selesai)
+
+`users` dapat `totpSecret` (plaintext — trust boundary SAMA seperti
+`passwordHash`, tidak ada secrets vault terpisah di codebase ini) dan
+`totpEnabled` (default false). Tabel baru `totp_recovery_codes`
+(`userId`, `codeHash` pakai `hashPassword`/`verifyPassword` argon2 yang
+sudah ada, `usedAt` nullable untuk one-time-use). Dependency baru
+`otpauth` (generate/validate TOTP) + `qrcode` (QR setup).
+
+Setup 2 langkah (`TotpService.startSetup`/`confirmSetup`) supaya setup
+typo tidak mengunci akun: mulai setup langsung simpan secret baru ke row
+user tapi `totpEnabled` TETAP false (setup yang ditinggalkan cuma
+nyisain secret tak terpakai, ke-overwrite attempt berikutnya) — cuma
+kode YANG BENAR-BENAR VALID yang nyalakan `totpEnabled`, sekaligus
+generate 8 recovery code yang di-return SEKALI SAJA (tidak bisa diambil
+lagi, pola sama seperti reveal API key).
+
+Login flow: `POST /api/auth/login` sekarang cek `user.totpEnabled`
+SETELAH guard zero-capability (Phase 19) tapi SEBELUM `setUserSession` —
+kalau enabled, balikin `{requiresTotp, challengeToken}` bukan session
+sungguhan. Token dilacak di map in-memory baru
+(`server/utils/totp-challenge.ts`, pola sama `rate-limit.ts`, TTL 5
+menit), diselesaikan lewat `POST /api/auth/totp/verify` (terima kode
+TOTP live ATAU recovery code sekali pakai), rate-limited PER
+challenge-token (terpisah dan lebih ketat dari limit login
+per-IP/per-email yang sudah ada — brute-force satu token yang
+dicuri/ditebak tetap terbatas berapa pun banyak IP yang dipakai
+penyerang). `login.vue` dapat langkah form kedua untuk ini.
+
+Self-service di halaman baru `/account` (halaman self-service PERTAMA di
+admin) — setup/disable 2FA, disable BUTUH re-entry password (session
+yang sudah terbuka saja tidak cukup untuk hal sesensitif ini). Jalur
+recovery admin-initiated mirror pola reset password yang sudah ada:
+`POST /api/users/[id]/totp/disable` (gate `manage_users`) di halaman
+edit user, untuk kasus user kehilangan device DAN recovery code-nya
+sekaligus.
+
+**Insiden false-alarm selama verifikasi, TANPA perubahan kode** (dicatat
+supaya tidak bingung lagi kalau terulang): satu SSR check sempat
+terlihat seolah session sama sekali tidak dikenali — ternyata rate limit
+login sudah habis dari saking banyaknya login test berulang saya sendiri
+(response 429 TETAP menyertakan header `set-cookie` yang bentuknya mirip
+cookie asli, dan saya menangkapnya tanpa cek status line). Restart dev
+server (bersihkan rate limiter in-memory) + re-cek ulang end-to-end
+dalam SATU shell invocation (bukan lintas beberapa panggilan Bash
+terpisah yang tidak share shell variable) mengonfirmasi session dan SSR
+keduanya baik-baik saja.
+
+**Diverifikasi runtime**: selesaikan setup dengan kode TOTP dihitung
+LANGSUNG dari secret yang di-return (pakai `generate()` otpauth sendiri,
+bukan ditebak) → dapat 8 recovery code → login password saja → dapat
+challenge token TANPA session terbuat (panggilan authenticated susulan
+401) → 3 kode salah ditolak, lanjut ke percobaan ke-9 → 429 (per
+challenge token, bukan per IP/email) → login baru + recovery code asli
+sukses → PAKAI ULANG recovery code YANG SAMA di challenge baru → ditolak
+(bukti one-time-use) → force-disable admin-initiated via halaman
+`/users/[id]` → akun bisa login password saja lagi setelahnya. Cleanup
+total (users count balik ke 1, tabel recovery codes kosong).
+Typecheck/lint bersih di core/admin, `pnpm test` 29/29. Build+deploy
+**admin saja** (`pm2 restart selftaught-admin` — frontend/theme tidak
+disentuh fase ini), live, tenant lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
