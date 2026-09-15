@@ -18,6 +18,41 @@ const disablePassword = ref("");
 const error = ref("");
 const busy = ref(false);
 
+interface ApiKeySummary {
+  id: string;
+  label: string;
+  scopes: string[];
+  lastUsedAt: string | null;
+  createdAt: string;
+  revokedAt: string | null;
+}
+
+const { data: apiKeys, refresh: refreshApiKeys } = await useApiFetch<ApiKeySummary[]>("/api/account/api-keys");
+const newKeyLabel = ref("");
+const revealedKey = ref("");
+const apiKeyBusy = ref(false);
+
+async function onCreateApiKey() {
+  if (!newKeyLabel.value.trim()) return;
+  apiKeyBusy.value = true;
+  try {
+    const result = await apiFetch<{ id: string; rawKey: string }>("/api/account/api-keys", {
+      method: "POST",
+      body: { label: newKeyLabel.value.trim() }
+    });
+    revealedKey.value = result.rawKey;
+    newKeyLabel.value = "";
+    await refreshApiKeys();
+  } finally {
+    apiKeyBusy.value = false;
+  }
+}
+
+async function onRevokeApiKey(id: string) {
+  await apiFetch(`/api/account/api-keys/${id}/revoke`, { method: "POST" });
+  await refreshApiKeys();
+}
+
 async function onStartSetup() {
   error.value = "";
   busy.value = true;
@@ -126,6 +161,46 @@ function onFinishSetup() {
           </UFormField>
           <UButton class="mt-3" color="error" variant="outline" :loading="busy" @click="onDisable">Nonaktifkan 2FA</UButton>
         </div>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">API Keys</h2>
+        </template>
+        <p class="text-sm text-slate-500 mb-3">
+          Untuk integrasi eksternal ke <code>GET /api/v1/*</code> (baca konten published) dan
+          <code>POST /api/v1/comments</code> (comment terautentikasi, diatribusi ke Anda). Lihat <code>docs/api.md</code>.
+        </p>
+
+        <UAlert
+          v-if="revealedKey"
+          color="warning"
+          variant="subtle"
+          title="Simpan key ini sekarang -- tidak akan ditampilkan lagi"
+          class="mb-4"
+        >
+          <template #description>
+            <code class="block break-all bg-slate-100 dark:bg-slate-800 rounded p-2 mt-2 text-xs">{{ revealedKey }}</code>
+          </template>
+        </UAlert>
+
+        <div class="flex gap-2 mb-4">
+          <UInput v-model="newKeyLabel" placeholder="Label (mis. 'Build script')" class="flex-1" />
+          <UButton :loading="apiKeyBusy" @click="onCreateApiKey">Buat Key</UButton>
+        </div>
+
+        <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+          <li v-for="key in apiKeys" :key="key.id" class="py-2.5 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ key.label }}</p>
+              <p class="text-xs text-slate-400">
+                {{ key.revokedAt ? "Revoked" : key.lastUsedAt ? `Terakhir dipakai: ${new Date(key.lastUsedAt).toLocaleString()}` : "Belum pernah dipakai" }}
+              </p>
+            </div>
+            <UButton v-if="!key.revokedAt" size="xs" variant="ghost" color="error" @click="onRevokeApiKey(key.id)">Revoke</UButton>
+          </li>
+          <li v-if="!apiKeys?.length" class="py-4 text-center text-slate-400 text-sm">Belum ada API key.</li>
+        </ul>
       </UCard>
     </div>
   </div>

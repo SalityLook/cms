@@ -2,6 +2,7 @@
 // Import only from server/ directories in the Nuxt apps — never from app/pages/components.
 export * from "./auth/password";
 export * from "./db/client";
+export * from "./domain/api-keys/index";
 export * from "./domain/comments/index";
 export * from "./domain/content/index";
 export * from "./domain/import-export/index";
@@ -22,6 +23,7 @@ export * from "./plugins/define-plugin";
 export * from "./registry/capabilities";
 
 import { db } from "./db/client";
+import { ApiKeyService } from "./domain/api-keys/api-key-service";
 import { CommentService } from "./domain/comments/comment-service";
 import { ContentMetaService } from "./domain/content/content-meta-service";
 import { ContentService } from "./domain/content/content-service";
@@ -44,6 +46,7 @@ import { UserService } from "./domain/users/user-service";
 
 export const userService = new UserService(db);
 export const totpService = new TotpService(db);
+export const apiKeyService = new ApiKeyService(db);
 export const roleService = new RoleService(db);
 export const permissionService = new PermissionService(roleService, userService);
 export const revisionService = new RevisionService(db);
