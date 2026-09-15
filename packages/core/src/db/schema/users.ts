@@ -9,6 +9,11 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash").notNull(),
   displayName: varchar("display_name", { length: 255 }).notNull(),
   status: userStatusEnum("status").notNull().default("active"),
+  bio: text("bio"),
+  // Soft reference, no FK constraint -- same pattern as content.featuredMediaId
+  // (Gotcha #12), avoids a circular import into schema/media.ts.
+  avatarMediaId: uuid("avatar_media_id"),
+  slug: varchar("slug", { length: 255 }).unique(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });

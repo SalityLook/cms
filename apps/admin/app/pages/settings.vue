@@ -13,6 +13,8 @@ const defaultOgImageMediaId = ref<string | null>((settings.value?.defaultOgImage
 const discourageSearchEngines = ref(Boolean(settings.value?.discourageSearchEngines));
 const commentsEnabled = ref(Boolean(settings.value?.commentsEnabled));
 const commentsRequireApproval = ref(settings.value?.commentsRequireApproval !== false);
+const allowSelfRegistration = ref(Boolean(settings.value?.allowSelfRegistration));
+const selfRegistrationDefaultRole = ref((settings.value?.selfRegistrationDefaultRole as string) || "subscriber");
 const saving = ref(false);
 
 async function onSave() {
@@ -27,7 +29,9 @@ async function onSave() {
       defaultOgImageMediaId: defaultOgImageMediaId.value,
       discourageSearchEngines: discourageSearchEngines.value,
       commentsEnabled: commentsEnabled.value,
-      commentsRequireApproval: commentsRequireApproval.value
+      commentsRequireApproval: commentsRequireApproval.value,
+      allowSelfRegistration: allowSelfRegistration.value,
+      selfRegistrationDefaultRole: selfRegistrationDefaultRole.value
     }
   });
   await refresh();
@@ -132,6 +136,26 @@ async function onSave() {
         <div class="space-y-3">
           <USwitch v-model="commentsEnabled" label="Aktifkan comment di post" />
           <USwitch v-model="commentsRequireApproval" label="Comment baru butuh approval admin dulu sebelum tampil publik" />
+        </div>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Self-Registration</h2>
+        </template>
+        <div class="space-y-3">
+          <USwitch
+            v-model="allowSelfRegistration"
+            label="Izinkan siapa saja mendaftar akun sendiri di situs publik"
+          />
+          <UFormField label="Role default untuk akun self-registered">
+            <USelect
+              v-model="selfRegistrationDefaultRole"
+              :items="[{ label: 'Subscriber (0 capability, direkomendasikan)', value: 'subscriber' }]"
+              value-key="value"
+              class="w-full"
+            />
+          </UFormField>
         </div>
       </UCard>
     </div>

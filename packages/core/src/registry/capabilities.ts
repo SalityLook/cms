@@ -79,6 +79,11 @@ export const SYSTEM_ROLES = {
     name: "Contributor",
     description: "Drafts content for review; cannot publish.",
     capabilities: ["edit_posts"] satisfies CapabilityKey[]
+  },
+  subscriber: {
+    name: "Subscriber",
+    description: "Self-registered public account. Zero capabilities -- can log into the public site but never the admin.",
+    capabilities: [] satisfies CapabilityKey[]
   }
 } as const;
 

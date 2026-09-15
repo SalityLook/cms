@@ -36,6 +36,7 @@ export interface UpdateContentInput {
 export interface ListContentFilters {
   type?: string;
   status?: ContentStatus;
+  authorId?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -353,6 +354,7 @@ export class ContentService {
     const conditions = [];
     if (filters.type) conditions.push(eq(content.type, filters.type));
     if (filters.status) conditions.push(eq(content.status, filters.status));
+    if (filters.authorId) conditions.push(eq(content.authorId, filters.authorId));
     const search = this.searchCondition(filters.search);
     if (search) conditions.push(search);
 
@@ -364,10 +366,11 @@ export class ContentService {
     });
   }
 
-  async count(filters: Pick<ListContentFilters, "type" | "status" | "search"> = {}): Promise<number> {
+  async count(filters: Pick<ListContentFilters, "type" | "status" | "authorId" | "search"> = {}): Promise<number> {
     const conditions = [];
     if (filters.type) conditions.push(eq(content.type, filters.type));
     if (filters.status) conditions.push(eq(content.status, filters.status));
+    if (filters.authorId) conditions.push(eq(content.authorId, filters.authorId));
     const search = this.searchCondition(filters.search);
     if (search) conditions.push(search);
 

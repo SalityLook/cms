@@ -1,18 +1,18 @@
 import { loginSchema } from "@selftaught/core";
-import { permissionService, userService } from "@selftaught/core/server";
+import { userService } from "@selftaught/core/server";
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS_PER_IP = 20;
 const MAX_ATTEMPTS_PER_EMAIL = 5;
 
+// Deliberately the OPPOSITE guard from apps/admin's login: this app WELCOMES
+// zero-capability (subscriber) accounts -- they just can't log into admin.
 export default defineEventHandler(async (event) => {
   const body = await readValidatedBody(event, loginSchema.parse);
 
   const ip = getRequestIP(event, { xForwardedFor: true }) ?? "unknown";
   const email = body.email.toLowerCase();
 
-  // Two dimensions on purpose: IP limit catches one attacker spraying many
-  // accounts; email limit catches many attackers/IPs targeting one account.
   if (!checkRateLimit(`login:ip:${ip}`, MAX_ATTEMPTS_PER_IP, WINDOW_MS)) {
     throw createError({ statusCode: 429, statusMessage: "Too many login attempts. Try again later." });
   }
@@ -25,21 +25,9 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 401, statusMessage: "Invalid email or password" });
   }
 
-  // Zero-capability accounts (self-registered subscribers, Phase 19) can log
-  // into the public site but never here -- rejected at the login boundary
-  // rather than letting them authenticate then 403 on every action.
-  const actor = await permissionService.loadActor(user.id);
-  if (!actor || actor.capabilities.length === 0) {
-    throw createError({ statusCode: 403, statusMessage: "This account does not have admin access." });
-  }
-
   await setUserSession(event, {
-    user: {
-      id: user.id,
-      email: user.email,
-      displayName: user.displayName
-    }
+    user: { id: user.id, email: user.email, displayName: user.displayName, slug: user.slug }
   });
 
-  return { id: user.id, email: user.email, displayName: user.displayName };
+  return { id: user.id, email: user.email, displayName: user.displayName, slug: user.slug };
 });

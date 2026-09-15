@@ -22,14 +22,32 @@ export class UserService {
 
   async create(input: CreateUserInput) {
     const passwordHash = await hashPassword(input.password);
+    const slug = await this.generateUniqueSlug(input.displayName);
     const [user] = await this.db
       .insert(users)
-      .values({ email: input.email.toLowerCase(), passwordHash, displayName: input.displayName })
+      .values({ email: input.email.toLowerCase(), passwordHash, displayName: input.displayName, slug })
       .returning();
     if (user) {
       await hooks.emitAction("user:registered", { userId: user.id, email: user.email });
     }
     return user;
+  }
+
+  /** Auto-generated at creation for every user (self-registered or admin-created) so /author/[slug] always has something to link to. Same slugify algorithm as posts/pages (apps/admin/app/pages/posts/new.vue). */
+  private async generateUniqueSlug(displayName: string): Promise<string> {
+    const base = displayName
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "user";
+
+    let candidate = base;
+    let n = 2;
+    while (await this.db.query.users.findFirst({ where: eq(users.slug, candidate) })) {
+      candidate = `${base}-${n}`;
+      n += 1;
+    }
+    return candidate;
   }
 
   findByEmail(email: string) {
@@ -38,6 +56,10 @@ export class UserService {
 
   findById(id: string) {
     return this.db.query.users.findFirst({ where: eq(users.id, id) });
+  }
+
+  findBySlug(slug: string) {
+    return this.db.query.users.findFirst({ where: eq(users.slug, slug) });
   }
 
   list(filters: ListUserFilters = {}) {
@@ -72,7 +94,7 @@ export class UserService {
     return user;
   }
 
-  async updateProfile(id: string, input: { displayName?: string }) {
+  async updateProfile(id: string, input: { displayName?: string; bio?: string | null; avatarMediaId?: string | null }) {
     const [user] = await this.db
       .update(users)
       .set({ ...input, updatedAt: new Date() })
