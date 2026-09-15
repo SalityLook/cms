@@ -985,11 +985,14 @@ bukan diam-diam dilewati**:
   tapi menambahnya sekarang tanpa kebutuhan itu adalah over-engineering,
   bukan hardening.
 
-**Belum dijalankan sungguhan di GitHub Actions** (cuma diverifikasi lolos
-secara lokal langkah-per-langkah) — cek `Actions` tab repo setelah push
-pertama ke `master` untuk konfirmasi CI benar-benar hijau di lingkungan
-GitHub, ada kemungkinan kecil perbedaan environment (mis. versi tool
-runner) yang tidak kena di sandbox ini.
+**UPDATE (dikonfirmasi 2026-09-15)**: repo SUDAH punya remote GitHub
+(`https://github.com/SalityLook/cms`, public, default branch `main`) dan
+CI SUDAH benar-benar jalan hijau di sana (dikonfirmasi lewat GitHub API,
+beberapa run terakhir semua `completed`/`success`) — item "belum
+dijalankan sungguhan" di atas SUDAH TIDAK berlaku, cuma belum
+ter-update di sini sampai sekarang. Kapan/siapa yang push remote ini
+tidak tercatat di histori kerja sesi-sesi sebelumnya — kalau perlu detail
+lebih lanjut, cek langsung `git log`/GitHub, bukan andalkan dokumen ini.
 
 ## Pekerjaan pasca-roadmap #5: Production deployment (LIVE)
 
@@ -1068,15 +1071,28 @@ lain juga.
   `babussalam.sch.id` dan `maratussholihah.ponpes.id` setelah tiap
   perubahan nginx/certbot, tetap 200 seperti sebelumnya.
 
-**Belum selesai — butuh user menjalankan sendiri (lihat Gotcha #20)**:
-isolasi database produksi. Role `selftaught_app` (least-privilege, scoped
-ke DB `selftaught` saja) SUDAH dibuat (`CREATE ROLE` tidak diblokir), tapi
-langkah pemindahan ownership (`ALTER DATABASE ... OWNER TO`, `GRANT ALL ON
-SCHEMA public`, `REASSIGN OWNED BY postgres TO selftaught_app`) diblokir
-classifier. `DATABASE_URL` produksi MASIH pakai `postgres` superuser
-sampai user menjalankan SQL itu sendiri + update `.env` + `pm2 restart
-selftaught-admin selftaught-frontend`. Bukan darurat (Postgres cuma listen
-`127.0.0.1`, tidak diekspos publik) tapi tetap defense-in-depth yang
+**UPDATE (dikonfirmasi 2026-09-15) — LEBIH DEKAT SELESAI dari yang
+tercatat**: dicek ulang, ternyata `ALTER DATABASE selftaught OWNER TO
+selftaught_app` SUDAH dijalankan (owner DB sekarang `selftaught_app`,
+bukan `postgres`) DAN grant `SELECT`/`INSERT`/`UPDATE`/`DELETE`/`USAGE`/
+`CREATE` di schema `public` SUDAH ada untuk role itu (dikonfirmasi via
+`has_table_privilege`/`has_schema_privilege` — role itu bahkan bisa
+`CREATE` tabel baru, jadi migration masa depan pun aman). Yang BENAR-BENAR
+masih kurang cuma **password role `selftaught_app` belum pernah
+di-set** — `ALTER ROLE selftaught_app WITH PASSWORD '...'` DIBLOKIR
+classifier keamanan (alasan `[Secret-Store Writes]`, beda dari alasan
+`[Permission Grant]` di Gotcha #20 tapi efeknya sama: butuh user jalankan
+sendiri). Kapan/siapa yang menjalankan `ALTER DATABASE OWNER`+`GRANT` di
+atas juga tidak tercatat di histori sesi manapun — kemungkinan besar user
+menjalankannya sendiri via `!` di sesi yang tidak terdokumentasi di sini.
+
+**Belum selesai — butuh user menjalankan sendiri**: set password role
+`selftaught_app`, lalu update `DATABASE_URL` di `.env` jadi
+`postgres://selftaught_app:<password>@localhost:5432/selftaught`, lalu
+`pm2 restart selftaught-admin selftaught-frontend`. `DATABASE_URL`
+produksi MASIH pakai `postgres` superuser sampai ini dijalankan. Bukan
+darurat (Postgres cuma listen `127.0.0.1`, tidak diekspos publik) tapi
+tetap defense-in-depth yang
 penting di VPS bersama seperti ini — kalau sesi Claude Code berikutnya
 lihat `DATABASE_URL` masih `postgres:postgres@...`, ingatkan user lagi.
 
@@ -2037,9 +2053,85 @@ tenant lain tidak terganggu.
 10-24) yang disetujui sesi ini** — lihat bagian "Rencana kesetaraan
 fitur WordPress" di atas untuk arc lengkap dari Phase 10 sampai sini.
 
+## Pekerjaan pasca-roadmap #26: Production-readiness follow-up
+
+User tanya "apakah sudah siap production?" setelah semua 15 fase di atas
+selesai. Jawaban: pada dasarnya ya (sudah live, sudah lewat hardening
+pass #4), tapi ada beberapa gap dicek satu-satu.
+
+**Temuan mengejutkan — dokumen ini SENDIRI sudah basi di 3 tempat**,
+ketahuan begitu dicek ulang kondisi live (bukan cuma percaya catatan
+lama):
+1. Isolasi DB (Gotcha #20/Pekerjaan #5) ternyata SUDAH lebih jauh dari
+   yang tercatat — owner DB dan grant schema untuk `selftaught_app`
+   SUDAH ada, cuma password role-nya yang belum di-set (lihat update di
+   Pekerjaan #5 di atas).
+2. Git remote SUDAH ada (`github.com/SalityLook/cms`, public) — dokumen
+   bilang "belum ada remote".
+3. CI SUDAH jalan hijau sungguhan di GitHub Actions — dokumen bilang
+   "belum dijalankan sungguhan".
+
+**Pelajaran**: kalau ditanya status/kesiapan sesuatu yang sudah lama
+tidak disentuh, JANGAN cuma quote CLAUDE.md — cek kondisi LIVE dulu
+(`psql \du`/`has_table_privilege`, `git ls-remote`, GitHub API buat
+Actions run) sebelum menjawab atau bertindak berdasarkan dokumen ini.
+Dokumen ini adalah snapshot titik waktu, bukan source of truth realtime.
+
+**Structured logging/monitoring** (menutup item deferred di Pekerjaan
+#4) — SELESAI. `packages/core/src/logger.ts` baru (`pino`, JSON polos ke
+stdout, level dari env `LOG_LEVEL`, TANPA transport/pretty-printing —
+pm2 sudah capture+rotate stdout lewat `pm2-logrotate`, jadi tidak perlu
+urus file sendiri). Satu Nitro plugin baru per app
+(`apps/admin/server/plugins/01.error-logger.ts`,
+`apps/frontend/server/plugins/00.error-logger.ts`) hook ke Nitro
+`error` lifecycle hook GLOBAL — BUKAN nyentuh `defineApiHandler` atau
+route manapun satu-satu. `createError()` TETAP lewat hook ini (tidak
+di-bypass), jadi satu hook ini nangkep SEMUA error di kedua app,
+termasuk yang di `apps/frontend` yang tidak punya `defineApiHandler`
+sama sekali.
+
+**Diverifikasi runtime**: request tanpa auth → log 401 dengan
+method/path/statusCode/stack lengkap sebagai JSON → request authenticated
+ke post yang tidak ada → log 404 dari `NotFoundError` yang di-mapping
+`defineApiHandler` → sama di `apps/frontend` (yang jalur errornya beda,
+inline per-route, bukan lewat `defineApiHandler`) → cleanup user QA.
+Typecheck/lint bersih di core/admin/frontend, `pnpm test` 29/29.
+Build+deploy kedua app + `pm2 restart` — **dikonfirmasi di PRODUKSI
+sungguhan** (bukan cuma dev): request nyata ke `self-taught.my.id`
+menghasilkan baris log JSON terstruktur di file log pm2
+(`/root/.pm2/logs/selftaught-frontend-out.log`).
+
+**Item yang MASIH butuh user jalankan sendiri** (classifier keamanan
+blokir, 2 alasan berbeda tapi efek sama):
+- Set password role `selftaught_app` (`ALTER ROLE ... WITH PASSWORD`) —
+  diblokir alasan `[Secret-Store Writes]`. Setelah itu, update
+  `DATABASE_URL` di `.env` root jadi
+  `postgres://selftaught_app:<password>@localhost:5432/selftaught`,
+  lalu `pm2 restart selftaught-admin selftaught-frontend`. Semua grant
+  yang dibutuhkan SUDAH ada (lihat update Pekerjaan #5) — ini murni soal
+  set password + ganti connection string, seharusnya cepat begitu user
+  yang jalankan.
+
+**Item yang masih perlu keputusan/input user** (bukan blocker teknis,
+tapi butuh preferensi/kredensial yang tidak saya punya):
+- Self-service password reset via email — butuh kredensial SMTP (host,
+  port, user, password, alamat pengirim). Belum ditanyakan/dikerjakan di
+  putaran ini, nunggu user putuskan mau pakai layanan apa (atau skip
+  kalau memang tidak perlu untuk skala saat ini — `pnpm reset-password`
+  CLI tetap ada sebagai jalur darurat).
+
 ## Git
 
-Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
-(bukan `--global`): `user.email=sisalamdev@gmail.com`. Satu commit per fase —
-jalankan `git log --oneline` untuk daftar terkini (jangan andalkan daftar hash
+Repo `git init` dari awal, dan **SEKARANG SUDAH punya remote** (dikonfirmasi
+2026-09-15, sebelumnya dokumen ini salah bilang "belum ada remote" —
+kapan/siapa yang nambah remote ini tidak tercatat di sesi manapun):
+`origin` → `https://github.com/SalityLook/cms` (public, default branch
+`main`). Local branch masih bernama `master`, remote-nya `main` — sudah
+sinkron di tip yang sama, tapi kalau mau push, ingat beda nama branch ini
+(`git push origin master:main`, bukan `git push` polos yang akan bikin
+branch `master` baru di remote). CI (`.github/workflows/ci.yml`) SUDAH
+jalan hijau di GitHub Actions (dikonfirmasi via API, bukan cuma lolos
+lokal). Identitas git di-set lokal (bukan `--global`):
+`user.email=sisalamdev@gmail.com`. Satu commit per fase — jalankan
+`git log --oneline` untuk daftar terkini (jangan andalkan daftar hash
 statis di dokumen ini, gampang basi).
