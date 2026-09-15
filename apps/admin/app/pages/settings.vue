@@ -11,6 +11,8 @@ const siteLogoMediaId = ref<string | null>((settings.value?.siteLogoMediaId as s
 const siteFaviconMediaId = ref<string | null>((settings.value?.siteFaviconMediaId as string) ?? null);
 const defaultOgImageMediaId = ref<string | null>((settings.value?.defaultOgImageMediaId as string) ?? null);
 const discourageSearchEngines = ref(Boolean(settings.value?.discourageSearchEngines));
+const commentsEnabled = ref(Boolean(settings.value?.commentsEnabled));
+const commentsRequireApproval = ref(settings.value?.commentsRequireApproval !== false);
 const saving = ref(false);
 
 async function onSave() {
@@ -23,7 +25,9 @@ async function onSave() {
       siteLogoMediaId: siteLogoMediaId.value,
       siteFaviconMediaId: siteFaviconMediaId.value,
       defaultOgImageMediaId: defaultOgImageMediaId.value,
-      discourageSearchEngines: discourageSearchEngines.value
+      discourageSearchEngines: discourageSearchEngines.value,
+      commentsEnabled: commentsEnabled.value,
+      commentsRequireApproval: commentsRequireApproval.value
     }
   });
   await refresh();
@@ -119,6 +123,16 @@ async function onSave() {
           <p v-if="!mediaItems?.length" class="text-sm text-slate-400">Belum ada media.</p>
         </div>
         <USwitch v-model="discourageSearchEngines" label="Cegah mesin pencari mengindeks situs ini (robots.txt disallow all)" />
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Comments</h2>
+        </template>
+        <div class="space-y-3">
+          <USwitch v-model="commentsEnabled" label="Aktifkan comment di post" />
+          <USwitch v-model="commentsRequireApproval" label="Comment baru butuh approval admin dulu sebelum tampil publik" />
+        </div>
       </UCard>
     </div>
   </div>

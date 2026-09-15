@@ -1,3 +1,4 @@
+export * from "./comments";
 export * from "./content";
 export * from "./media";
 export * from "./revisions";

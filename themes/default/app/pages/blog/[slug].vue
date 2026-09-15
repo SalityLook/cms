@@ -5,7 +5,7 @@ import { BlockRenderer } from "@selftaught/blocks";
 const route = useRoute();
 const slug = route.params.slug as string;
 
-const { data: post } = await useFetch(`/api/posts/${slug}`);
+const { data: post, refresh } = await useFetch(`/api/posts/${slug}`);
 
 if (!post.value) {
   throw createError({ statusCode: 404, statusMessage: "Post not found" });
@@ -77,6 +77,15 @@ useHead({
         >
           #{{ tag.name }}
         </NuxtLink>
+      </div>
+
+      <div v-if="post?.commentsEnabled" class="mt-16 pt-8 border-t border-slate-200 dark:border-slate-800">
+        <h2 class="font-serif text-xl font-semibold text-slate-900 dark:text-white mb-6">
+          Komentar <span v-if="post.comments.length" class="text-slate-400 font-sans text-base">({{ post.comments.length }})</span>
+        </h2>
+        <CommentList v-if="post.comments.length" :comments="post.comments" class="mb-8" />
+        <p v-else class="text-sm text-slate-400 mb-8">Belum ada komentar. Jadi yang pertama!</p>
+        <CommentForm :content-id="post.id" @submitted="refresh" />
       </div>
     </div>
   </article>

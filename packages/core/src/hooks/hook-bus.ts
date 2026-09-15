@@ -14,6 +14,7 @@ export interface ActionMap {
   "content:statusChanged": { contentId: string; type: string; from: string; to: string };
   "content:published": { content: { id: string; type: string; slug: string; title: string } };
   "user:registered": { userId: string; email: string };
+  "comment:created": { commentId: string; contentId: string };
 }
 
 type ActionHandler<P> = (payload: P) => void | Promise<void>;

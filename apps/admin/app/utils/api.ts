@@ -157,6 +157,19 @@ export interface ContentSeo {
 
 export type SettingsMap = Record<string, unknown>;
 
+export type CommentStatus = "pending" | "approved" | "spam" | "trash";
+
+export interface CommentSummary {
+  id: string;
+  contentId: string;
+  parentId: string | null;
+  authorName: string;
+  authorEmail: string;
+  body: string;
+  status: CommentStatus;
+  createdAt: string;
+}
+
 export type UserStatus = "active" | "suspended";
 
 export interface UserSummary {
