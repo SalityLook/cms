@@ -1086,15 +1086,54 @@ sendiri). Kapan/siapa yang menjalankan `ALTER DATABASE OWNER`+`GRANT` di
 atas juga tidak tercatat di histori sesi manapun — kemungkinan besar user
 menjalankannya sendiri via `!` di sesi yang tidak terdokumentasi di sini.
 
-**Belum selesai — butuh user menjalankan sendiri**: set password role
-`selftaught_app`, lalu update `DATABASE_URL` di `.env` jadi
-`postgres://selftaught_app:<password>@localhost:5432/selftaught`, lalu
-`pm2 restart selftaught-admin selftaught-frontend`. `DATABASE_URL`
-produksi MASIH pakai `postgres` superuser sampai ini dijalankan. Bukan
-darurat (Postgres cuma listen `127.0.0.1`, tidak diekspos publik) tapi
-tetap defense-in-depth yang
-penting di VPS bersama seperti ini — kalau sesi Claude Code berikutnya
-lihat `DATABASE_URL` masih `postgres:postgres@...`, ingatkan user lagi.
+**SELESAI (2026-09-15)**: password role `selftaught_app` sudah di-set
+user (via `ALTER ROLE ... WITH PASSWORD`, dijalankan user sendiri lewat
+`!` — diblokir classifier alasan `[Secret-Store Writes]`), `DATABASE_URL`
+di `.env` sudah diganti ke
+`postgres://selftaught_app:<password>@localhost:5432/selftaught`, dan
+`pm2 restart selftaught-admin selftaught-frontend` sudah jalan.
+
+**2 gap tambahan ketemu SAAT switch, keduanya juga sudah di-fix user**
+(dicatat supaya kalau perlu bikin role serupa lagi nanti, jangan lewatkan
+langkah ini):
+1. **9 tabel yang dibuat Phase 13-24** (`comments`, `menus`, `menu_items`,
+   `installed_plugins`, `reusable_blocks`, `reusable_block_usages`,
+   `oembed_cache`, `totp_recovery_codes`, `api_keys`) TIDAK ikut kena
+   grant awal — `GRANT ... ON ALL TABLES IN SCHEMA public` ternyata
+   snapshot SATU WAKTU, bukan otomatis mencakup tabel yang dibuat
+   belakangan. Ketahuan dari `pnpm test` gagal ("permission denied for
+   table reusable_block_usages"), BUKAN dari asumsi. Fix: re-run
+   `GRANT ALL PRIVILEGES ON ALL TABLES/SEQUENCES IN SCHEMA public TO
+   selftaught_app` + `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN
+   SCHEMA public GRANT ALL ON TABLES TO selftaught_app` (yang terakhir
+   ini mencegah masalah yang SAMA terulang untuk tabel masa depan, KALAU
+   ada migration yang masih dijalankan sebagai `postgres`).
+2. **Schema `drizzle`** (tempat tabel tracking `__drizzle_migrations`)
+   JUGA belum ke-grant — `pnpm db:migrate` gagal "CREATE TABLE IF NOT
+   EXISTS" walau tabelnya sudah ada (Postgres tetap cek privilege CREATE
+   pada schema-nya duluan sebelum cek exists). Fix:
+   `GRANT USAGE, CREATE ON SCHEMA drizzle TO selftaught_app` + grant
+   serupa di tabel/sequence-nya + `ALTER DEFAULT PRIVILEGES` di schema
+   itu juga.
+
+**Diverifikasi sebelum DAN sesudah switch produksi** (bukan cuma asumsi
+"harusnya jalan"): `pnpm test` (29/29, termasuk integration test yang
+sungguhan insert/update/delete lewat Postgres asli) → `pnpm db:migrate` →
+`pnpm db:seed` — SEMUA jalan bersih dengan `selftaught_app` SEBELUM
+`pm2 restart`. Setelah restart: request publik nyata ke
+`self-taught.my.id` (termasuk `/api/v1/categories`) tetap 200 → **login +
+create post + trash + delete PERMANEN lewat `https://admin.self-taught.my.id`
+sungguhan** (bukan dev) pakai user QA sekali-pakai (dihapus lagi setelah,
+kredensial admin asli tidak tersentuh) — semua sukses, bukti nyata
+`selftaught_app` bisa nulis data lewat proses pm2 yang benar-benar hidup.
+Tenant lain di VPS ini (`babussalam.sch.id`, `maratussholihah.ponpes.id`)
+dikonfirmasi tetap 200. Ketemu 6 row `content` sisa (`vitest-fixture-*`)
+dari test run SEBELUM gap #1 di atas di-fix (test yang gagal tidak sempat
+jalankan cleanup `afterAll`-nya) — dibersihkan manual, `content` count
+balik ke 0. `DATABASE_URL` produksi SEKARANG pakai `selftaught_app`,
+BUKAN `postgres` superuser lagi — kalau sesi berikutnya lihat
+`postgres:postgres@...` lagi di `.env`, itu berarti ada regresi, bukan
+kondisi normal.
 
 ## Pekerjaan pasca-roadmap #6: UI/UX redesign (selesai)
 
