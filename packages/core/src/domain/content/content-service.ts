@@ -258,6 +258,54 @@ export class ContentService {
     return this.db.query.content.findFirst({ where: and(eq(content.type, type), eq(content.slug, slug)) });
   }
 
+  /**
+   * Copies the content row itself (forced to draft, no revisions carried
+   * over -- a duplicate starts its own history). Copying related rows
+   * (terms, content_meta, SEO) is orchestrated by the API route layer using
+   * the existing per-concern services, matching how this codebase already
+   * treats those as separate concerns coordinated outside ContentService
+   * (e.g. SEO is its own PUT endpoint, not merged into update()).
+   */
+  async duplicate(actor: Actor, id: string): Promise<ContentRow> {
+    const existing = await this.requireExisting(id);
+    const definition = this.requireContentType(existing.type);
+    this.assertOwnershipOrCapability(actor, existing, definition);
+
+    const slug = await this.generateUniqueSlug(existing.type, existing.slug);
+
+    const [row] = await this.db
+      .insert(content)
+      .values({
+        type: existing.type,
+        slug,
+        title: `${existing.title} (Copy)`,
+        excerpt: existing.excerpt,
+        content: existing.content,
+        contentText: existing.contentText,
+        authorId: actor.id,
+        featuredMediaId: existing.featuredMediaId,
+        parentId: existing.parentId,
+        menuOrder: existing.menuOrder,
+        status: "draft"
+      })
+      .returning();
+
+    if (!row) {
+      throw new Error("Failed to duplicate content");
+    }
+    return row;
+  }
+
+  private async generateUniqueSlug(type: string, baseSlug: string): Promise<string> {
+    let candidate = `${baseSlug}-copy`;
+    let n = 2;
+    while (await this.getBySlug(type, candidate)) {
+      candidate = `${baseSlug}-copy-${n}`;
+      n += 1;
+    }
+    return candidate;
+  }
+
   private searchCondition(search?: string) {
     if (!search) return undefined;
     const pattern = `%${search}%`;

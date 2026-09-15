@@ -41,6 +41,11 @@ async function onBulkAction(action: string) {
   clearSelection();
   await refresh();
 }
+
+async function onDuplicate(postId: string) {
+  const duplicate = await apiFetch<PostSummary>(`/api/posts/${postId}/duplicate`, { method: "POST" });
+  await navigateTo(`/posts/${duplicate.id}`);
+}
 </script>
 
 <template>
@@ -75,7 +80,7 @@ async function onBulkAction(action: string) {
       :selected-ids="selectedIds"
       :page="data?.page ?? 1"
       :total-pages="data?.totalPages ?? 1"
-      :columns-count="3"
+      :columns-count="4"
       :bulk-actions="bulkActions"
       empty-icon="i-lucide-file-text"
       empty-text="Belum ada post."
@@ -87,6 +92,7 @@ async function onBulkAction(action: string) {
         <th class="py-3 px-4 font-medium text-slate-500">Judul</th>
         <th class="py-3 px-4 font-medium text-slate-500">Status</th>
         <th class="py-3 px-4 font-medium text-slate-500">Diperbarui</th>
+        <th class="py-3 px-4 font-medium text-slate-500 text-right">Aksi</th>
       </template>
       <template #default="{ item: post }">
         <td class="py-3 px-4">
@@ -98,6 +104,9 @@ async function onBulkAction(action: string) {
           <UBadge :color="statusColor[post.status] ?? 'neutral'" variant="subtle">{{ post.status }}</UBadge>
         </td>
         <td class="py-3 px-4 text-slate-500">{{ new Date(post.updatedAt).toLocaleString() }}</td>
+        <td class="py-3 px-4 text-right">
+          <UButton size="xs" variant="ghost" color="neutral" icon="i-lucide-copy" @click="onDuplicate(post.id)">Duplikat</UButton>
+        </td>
       </template>
     </AdminDataTable>
   </div>
