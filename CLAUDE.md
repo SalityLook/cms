@@ -1418,6 +1418,62 @@ sebagian kuota 5/15menit — perilaku BENAR, bukan bug). Cleanup total
 Typecheck/lint/test bersih, CSS bundle re-check (67KB→71KB, Gotcha #21).
 Deploy kedua app — live.
 
+### Phase 14 — Custom Menus (selesai)
+
+Tabel baru `menus` (`key` unique, `name`) dan `menu_items` (`menuId` FK
+cascade, `parentId` self-ref 1 level TANPA FK/cascade — pattern sama
+`terms.parentId`, guard di service layer bukan DB — `label`, `linkType`
+enum(custom/content), `customUrl`/`contentId` nullable, `sortOrder`,
+`openInNewTab`). Capability baru `manage_menus` (masuk `editor` di
+`SYSTEM_ROLES`). `MenuService.resolveMenu(key)` — nilai tambah utamanya —
+join item `linkType='content'` ke tabel `content` SAAT DIBACA (bukan
+disimpan sebagai URL statis di `menu_items`), jadi link tetap benar walau
+slug/title target berubah belakangan; referensi content yang sudah
+terhapus (dangling) di-skip diam-diam alih-alih render link mati.
+`deleteItem()` guard kalau masih ada child (pattern sama
+`TaxonomyService.deleteTerm()`, Phase 11).
+
+Admin: `/menus` baru (pilih/buat menu, tambah item URL-custom atau
+pilih-content dari page/post yang sudah ada, reorder pakai tombol
+naik/turun (swap `sortOrder` antar sibling) + indent/outdent (ubah
+`parentId`) — SENGAJA tanpa library drag-drop, konsisten filosofi theme
+publik "Tailwind polos, tanpa dependency baru yang tidak perlu"). Nav
+sidebar admin dapat entry "Menus" baru.
+
+Frontend: `GET /api/menus/[key]` baru di KEDUA app, tanpa auth (pattern
+sama `GET /api/branding`) — dipanggil publik dari
+`themes/default/app/layouts/default.vue` yang array `navLinks`
+hardcoded-nya diganti fetch `menus/primary` (nav) dan `menus/footer`
+(footer), MASING-MASING dengan fallback ke link hardcoded lama
+(Beranda/Blog) kalau menu itu belum dikonfigurasi/kosong — supaya
+instalasi baru yang belum sentuh `/menus` nav-nya tidak pernah kosong.
+
+**Catatan verifikasi**: karena dev dan produksi berbagi Postgres yang
+sama (lihat peringatan ⚠️ di atas), dan password admin produksi yang
+sungguhan TIDAK diketahui (sudah diganti dari seed default sejak
+Pekerjaan #5), testing login-based curl fase ini pakai **user QA
+sementara** (dibuat via script `tsx` langsung panggil
+`userService.create()`+`roleService.setRolesForUser(..., ["admin"])`,
+BUKAN reset password admin asli) — dihapus lagi (row `users`+`user_roles`)
+begitu verifikasi selesai, tanpa pernah menyentuh kredensial admin
+produksi. Kalau sesi berikutnya butuh login sungguhan di dev/curl testing
+dan tidak tahu password admin saat ini, ulangi pola ini (bikin+hapus user
+QA sekali pakai) daripada reset password admin asli.
+
+**Diverifikasi runtime**: buat menu "primary" → tambah item content-linked
+(page) + item custom-link → cek urutan+resolusi awal benar → reorder
+(swap `sortOrder`) → resolusi ikut berubah urutan → SSR homepage render
+nav sesuai urutan baru → **ganti slug page yang di-link → resolve ulang
+tanpa nulis apa pun ke `menu_items` → link nav otomatis ikut berubah**
+(bukti resolusi tidak stale, bukan cuma diasumsikan) → nested 1 item jadi
+child item lain → hapus parent selagi masih py child → 400 ditolak dengan
+pesan jelas → hapus child dulu → hapus parent → sukses → hapus menu →
+cascade `menu_items` ikut terhapus → SSR halaman admin `/menus` render
+benar. Cleanup total (`menus`/`menu_items`/content test 0, user QA
+terhapus, admin asli tidak tersentuh). Typecheck/lint/test (29/29) bersih,
+CSS bundle re-check (Gotcha #21). Build kedua app + `pm2 restart` — live
+di kedua domain, tenant lain di VPS ini tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
