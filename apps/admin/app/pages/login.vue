@@ -8,18 +8,42 @@ const loading = ref(false);
 const { fetch: refreshSession } = useUserSession();
 const { data: branding } = await useApiFetch<{ siteName: string }>("/api/branding");
 
+const challengeToken = ref("");
+const totpCode = ref("");
+
 async function onSubmit() {
   error.value = "";
   loading.value = true;
   try {
-    await $fetch("/api/auth/login", {
+    const result = await $fetch<{ requiresTotp?: boolean; challengeToken?: string }>("/api/auth/login", {
       method: "POST",
       body: { email: email.value, password: password.value }
     });
+    if (result.requiresTotp && result.challengeToken) {
+      challengeToken.value = result.challengeToken;
+      return;
+    }
     await refreshSession();
     await navigateTo("/");
   } catch {
     error.value = "Email atau password salah.";
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function onSubmitTotp() {
+  error.value = "";
+  loading.value = true;
+  try {
+    await $fetch("/api/auth/totp/verify", {
+      method: "POST",
+      body: { challengeToken: challengeToken.value, code: totpCode.value }
+    });
+    await refreshSession();
+    await navigateTo("/");
+  } catch {
+    error.value = "Kode salah atau sudah kedaluwarsa.";
   } finally {
     loading.value = false;
   }
@@ -57,39 +81,69 @@ async function onSubmit() {
           <BrandLogo img-class="h-7 w-auto" />
         </div>
 
-        <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Selamat datang kembali</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Masuk ke dashboard untuk mengelola konten.</p>
+        <template v-if="!challengeToken">
+          <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Selamat datang kembali</h1>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Masuk ke dashboard untuk mengelola konten.</p>
 
-        <form class="mt-8 space-y-4" @submit.prevent="onSubmit">
-          <UFormField label="Email">
-            <UInput
-              v-model="email"
-              type="email"
-              autocomplete="email"
-              placeholder="nama@contoh.com"
-              icon="i-lucide-mail"
-              size="lg"
-              required
-              class="w-full"
-            />
-          </UFormField>
-          <UFormField label="Password">
-            <UInput
-              v-model="password"
-              type="password"
-              autocomplete="current-password"
-              placeholder="••••••••"
-              icon="i-lucide-lock"
-              size="lg"
-              required
-              class="w-full"
-            />
-          </UFormField>
+          <form class="mt-8 space-y-4" @submit.prevent="onSubmit">
+            <UFormField label="Email">
+              <UInput
+                v-model="email"
+                type="email"
+                autocomplete="email"
+                placeholder="nama@contoh.com"
+                icon="i-lucide-mail"
+                size="lg"
+                required
+                class="w-full"
+              />
+            </UFormField>
+            <UFormField label="Password">
+              <UInput
+                v-model="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="••••••••"
+                icon="i-lucide-lock"
+                size="lg"
+                required
+                class="w-full"
+              />
+            </UFormField>
 
-          <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="error" />
+            <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="error" />
 
-          <UButton type="submit" block size="lg" :loading="loading">Masuk</UButton>
-        </form>
+            <UButton type="submit" block size="lg" :loading="loading">Masuk</UButton>
+          </form>
+        </template>
+
+        <template v-else>
+          <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">Verifikasi Dua Faktor</h1>
+          <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            Masukkan kode dari aplikasi authenticator, atau salah satu recovery code Anda.
+          </p>
+
+          <form class="mt-8 space-y-4" @submit.prevent="onSubmitTotp">
+            <UFormField label="Kode">
+              <UInput
+                v-model="totpCode"
+                type="text"
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                placeholder="123456"
+                icon="i-lucide-shield-check"
+                size="lg"
+                required
+                class="w-full"
+              />
+            </UFormField>
+
+            <UAlert v-if="error" color="error" variant="subtle" icon="i-lucide-alert-circle" :title="error" />
+
+            <UButton type="submit" block size="lg" :loading="loading">Verifikasi</UButton>
+            <UButton type="button" variant="ghost" color="neutral" block @click="challengeToken = ''">Kembali</UButton>
+          </form>
+        </template>
       </div>
     </div>
   </div>

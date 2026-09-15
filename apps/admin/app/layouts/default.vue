@@ -103,7 +103,11 @@ const initials = computed(() => {
 
       <div class="p-3 border-t border-slate-200 dark:border-slate-800">
         <UDropdownMenu
-          :items="[[{ label: user?.displayName, icon: 'i-lucide-user', disabled: true }], [{ label: 'Keluar', icon: 'i-lucide-log-out', onSelect: onLogout }]]"
+          :items="[
+            [{ label: user?.displayName, icon: 'i-lucide-user', disabled: true }],
+            [{ label: 'Akun Saya', icon: 'i-lucide-settings-2', to: '/account' }],
+            [{ label: 'Keluar', icon: 'i-lucide-log-out', onSelect: onLogout }]
+          ]"
           :content="{ side: 'top', align: 'start' }"
         >
           <button
@@ -169,7 +173,8 @@ const initials = computed(() => {
             </NuxtLink>
           </div>
         </nav>
-        <div class="p-3 border-t border-slate-200 dark:border-slate-800">
+        <div class="p-3 border-t border-slate-200 dark:border-slate-800 space-y-1">
+          <UButton to="/account" block variant="ghost" color="neutral" icon="i-lucide-settings-2" @click="mobileNavOpen = false">Akun Saya</UButton>
           <UButton block variant="ghost" icon="i-lucide-log-out" @click="onLogout">Keluar</UButton>
         </div>
       </template>

@@ -61,6 +61,19 @@ async function onSetPassword() {
     passwordSaving.value = false;
   }
 }
+
+const totpDisabling = ref(false);
+const totpDisableSuccess = ref(false);
+
+async function onForceDisableTotp() {
+  totpDisabling.value = true;
+  try {
+    await apiFetch(`/api/users/${id}/totp/disable`, { method: "POST" });
+    totpDisableSuccess.value = true;
+  } finally {
+    totpDisabling.value = false;
+  }
+}
 </script>
 
 <template>
@@ -129,6 +142,20 @@ async function onSetPassword() {
         </div>
         <p v-if="passwordSuccess" class="text-sm text-green-600 mt-2">Password berhasil diganti.</p>
         <p v-if="passwordError" class="text-sm text-red-500 mt-2">{{ passwordError }}</p>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Two-Factor Authentication</h2>
+        </template>
+        <p class="text-xs text-slate-400 mb-3">
+          Kalau user ini kehilangan akses ke aplikasi authenticator DAN recovery code-nya, nonaktifkan 2FA di sini
+          supaya mereka bisa login lagi dengan password saja lalu setup ulang.
+        </p>
+        <UButton :loading="totpDisabling" color="error" variant="outline" @click="onForceDisableTotp">
+          Force Nonaktifkan 2FA
+        </UButton>
+        <p v-if="totpDisableSuccess" class="text-sm text-green-600 mt-2">2FA berhasil dinonaktifkan untuk user ini.</p>
       </UCard>
 
       <UAlert v-if="error" color="error" variant="subtle" :title="error" />

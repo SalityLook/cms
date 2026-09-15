@@ -33,6 +33,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 403, statusMessage: "This account does not have admin access." });
   }
 
+  // TOTP-enabled accounts don't get a real session yet -- a short-lived
+  // challenge token stands in until POST /api/auth/totp/verify confirms a
+  // real code (or recovery code). The capability check above still applies
+  // first: a zero-capability account is rejected outright regardless of
+  // whether it even has TOTP configured.
+  if (user.totpEnabled) {
+    const challengeToken = createTotpChallenge(user.id);
+    return { requiresTotp: true, challengeToken };
+  }
+
   await setUserSession(event, {
     user: {
       id: user.id,

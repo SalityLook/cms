@@ -14,6 +14,10 @@ export const users = pgTable("users", {
   // (Gotcha #12), avoids a circular import into schema/media.ts.
   avatarMediaId: uuid("avatar_media_id"),
   slug: varchar("slug", { length: 255 }).unique(),
+  // Plaintext -- same trust boundary as passwordHash (no separate secrets
+  // vault in this codebase to encrypt it further at rest). See Phase 22.
+  totpSecret: text("totp_secret"),
+  totpEnabled: boolean("totp_enabled").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
 });
@@ -59,6 +63,16 @@ export const userRoles = pgTable(
   (table) => [primaryKey({ columns: [table.userId, table.roleId] })]
 );
 
+export const totpRecoveryCodes = pgTable("totp_recovery_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  codeHash: text("code_hash").notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+});
+
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),
   userId: uuid("user_id")
@@ -72,7 +86,12 @@ export const sessions = pgTable("sessions", {
 
 export const usersRelations = relations(users, ({ many }) => ({
   userRoles: many(userRoles),
-  sessions: many(sessions)
+  sessions: many(sessions),
+  totpRecoveryCodes: many(totpRecoveryCodes)
+}));
+
+export const totpRecoveryCodesRelations = relations(totpRecoveryCodes, ({ one }) => ({
+  user: one(users, { fields: [totpRecoveryCodes.userId], references: [users.id] })
 }));
 
 export const rolesRelations = relations(roles, ({ many }) => ({
