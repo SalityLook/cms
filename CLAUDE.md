@@ -1778,6 +1778,76 @@ core/admin, `pnpm test` 29/29. Build+deploy **admin saja** (`pm2 restart
 selftaught-admin` — frontend/theme tidak disentuh fase ini), live, tenant
 lain tidak terganggu.
 
+### Phase 21 — Plugin/theme installer UI (scope sesuai realita arsitektur) (selesai)
+
+**Batasan nyata dinyatakan di depan, bukan didesain sekitarnya**:
+`plugins.config.ts` tetap array TS statis — plugin PACKAGE mana yang
+tersedia tetap level kode (harus sudah ter-build ke bundle yang di-deploy;
+tidak ada `require()` runtime arbitrary di app Nitro yang di-compile
+ahead-of-time). Yang BISA pindah ke DB: enable/disable PER plugin yang
+SUDAH terdaftar di kode — dan itu pun baru berlaku penuh setelah proses
+restart (`server/plugins/00.load-plugins.ts` jalan SEKALI saat boot).
+Theme lebih terbatas lagi: `extends` di `apps/frontend/nuxt.config.ts`
+di-resolve Vite/Nitro saat build time (Gotcha #14/#15) — TIDAK ADA
+switcher live, section theme di halaman admin READ-ONLY (tampilkan nama
+theme aktif doang).
+
+Tabel baru `installed_plugins` (key unique, enabled default true, config
+jsonb), di-upsert saat boot untuk tiap entry `plugins.config.ts` TANPA
+menimpa toggle `enabled=false` admin sebelumnya (`PluginService.ensureRegistered()`
+pakai `onConflictDoNothing`). `setup()` cuma jalan untuk plugin yang DB
+bilang enabled. Consumer pertama capability `manage_plugins` (terdaftar
+sejak Phase 7, baru sekarang benar-benar dipakai).
+
+Halaman admin baru `/plugins`: toggle per plugin + peringatan "berlaku
+setelah restart", plus card Theme read-only. Endpoint baru
+`GET/PATCH /api/plugins` (gate `manage_plugins`) dan
+`GET /api/plugins/enabled` (gate cuma "sudah login", BUKAN `manage_plugins`
+— semua user butuh ini untuk tahu panel apa yang mesti dirender, bukan
+cuma admin plugin).
+
+**2 bug nyata ketemu DAN diperbaiki dari verifikasi fase ini sendiri**
+(bukan hipotetis, keduanya benar-benar merusak fitur sebelum di-fix):
+1. Cek panel-disabled di `app/plugins/load-plugins.ts` draft pertama
+   pakai `$fetch` polos di dalam Nuxt plugin — kelas bug SAMA dengan
+   riwayat Gotcha #17 punya `apps/admin/app/utils/api.ts`: `$fetch` polos
+   saat SSR TIDAK request-scoped, tidak forward cookie session, jadi
+   halaman SSR selalu lihat "belum login" dan diam-diam skip register
+   panel WALAU plugin-nya enabled. Fix: reuse `apiFetch()` yang sudah ada,
+   bukan re-derive fix yang sama dari nol.
+2. `AdminUIRegistry.registerEditorPanel()` TIDAK punya dedup — karena
+   Nuxt plugin yang memanggilnya jalan ULANG tiap SSR request tapi
+   registry-nya module-level singleton yang HIDUP LEBIH LAMA dari satu
+   request, tiap request selagi plugin enabled push COPY DUPLIKAT
+   component yang SAMA ke list, yang kalau tidak di-fix bakal
+   me-render panel berkali-kali. Di-fix jadi idempotent (skip kalau
+   component yang SAMA sudah terdaftar untuk content type itu).
+
+Karakteristik singleton-lifetime yang SAMA itu juga berarti disable
+plugin TIDAK BISA un-register panel yang SUDAH terdaftar atau un-grant
+capability yang SUDAH di-grant DALAM proses yang SAMA yang sedang
+jalan — keduanya butuh restart sungguhan, konsisten dengan (bukan
+workaround dari) batasan scope fase ini.
+
+**Diverifikasi runtime pakai metode PERSIS sesuai plan** (kill+restart
+dev server sungguhan antar toggle, BUKAN cek live tanpa restart): disable
+example-plugin → restart → konfirmasi panel TIDAK render di SSR DAN hook
+`content:published` TIDAK log lagi saat publish (boot log
+`"0/1 enabled: (none)"`) → enable lagi → restart lagi → konfirmasi pulih
+total (panel balik, boot log `"1/1 enabled: example-plugin"`).
+
+**Satu limitasi model capability ketahuan, DITERIMA bukan ditutup-tutupi**:
+capability yang SUDAH di-grant ke role admin di `role_capabilities` TIDAK
+otomatis di-revoke saat plugin yang mendaftarkannya di-disable —
+`CapabilityRegistry` di codebase ini additive-only sejak Phase 7 (tidak
+ada tracking kepemilikan capability-ke-plugin, tidak ada jalur revoke),
+dan bikin revocation sungguhan butuh attribution itu dibangun dulu.
+Didokumentasikan sebagai limitasi diketahui, bukan diselesaikan diam-diam
+di fase ini. Cleanup total (content 0, user QA terhapus). Typecheck/lint
+bersih di core/admin, `pnpm test` 29/29. Build+deploy **admin saja**
+(`pm2 restart selftaught-admin` — frontend/theme tidak disentuh fase
+ini), live, tenant lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
