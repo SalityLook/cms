@@ -27,6 +27,7 @@ const manageNav: NavItem[] = [
   { label: "Users", to: "/users", icon: "i-lucide-users" },
   { label: "Roles", to: "/roles", icon: "i-lucide-shield" },
   { label: "Import/Export", to: "/import-export", icon: "i-lucide-database" },
+  { label: "Plugins & Theme", to: "/plugins", icon: "i-lucide-puzzle" },
   { label: "Settings", to: "/settings", icon: "i-lucide-settings" }
 ];
 
