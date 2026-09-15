@@ -20,6 +20,7 @@ export * from "./domain/totp/index";
 export * from "./domain/users/index";
 export * from "./errors";
 export * from "./hooks/hook-bus";
+export * from "./logger";
 export * from "./plugins/define-plugin";
 export * from "./registry/capabilities";
 
