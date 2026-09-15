@@ -48,3 +48,16 @@ export const contentDocumentSchema = z.object({
   type: z.literal("doc"),
   content: z.array(blockNodeSchema)
 });
+
+/** Walks the block tree and concatenates every text node -- used to build the plain-text search index (Phase 15) and revision diffs (Phase 18). */
+export function extractPlainText(doc: ContentDocument): string {
+  const parts: string[] = [];
+  function walk(nodes: BlockNode[]) {
+    for (const node of nodes) {
+      if (node.text) parts.push(node.text);
+      if (node.content) walk(node.content);
+    }
+  }
+  walk(doc.content);
+  return parts.join(" ");
+}

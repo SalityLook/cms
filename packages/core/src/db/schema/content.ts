@@ -32,6 +32,7 @@ export const content = pgTable(
     excerpt: text("excerpt"),
     content: jsonb("content").notNull().$type<ContentDocument>(),
     contentHtml: text("content_html"),
+    contentText: text("content_text"),
     status: contentStatusEnum("status").notNull().default("draft"),
     authorId: uuid("author_id")
       .notNull()

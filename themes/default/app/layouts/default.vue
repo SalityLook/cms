@@ -49,21 +49,40 @@ const footerLinks = computed(() => (footerMenu.value && footerMenu.value.length 
           >
             {{ link.label }}
           </NuxtLink>
+          <form method="get" action="/search" class="flex items-center">
+            <input
+              type="search"
+              name="q"
+              placeholder="Cari..."
+              class="w-32 focus:w-48 transition-all rounded-md border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 px-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            />
+          </form>
         </nav>
 
-        <button
-          type="button"
-          class="sm:hidden size-9 flex items-center justify-center rounded-md text-slate-600 dark:text-slate-300"
-          aria-label="Buka menu"
-          @click="mobileMenuOpen = !mobileMenuOpen"
-        >
+        <div class="flex items-center gap-1 sm:hidden">
+          <NuxtLink
+            to="/search"
+            class="size-9 flex items-center justify-center rounded-md text-slate-600 dark:text-slate-300"
+            aria-label="Cari"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+            </svg>
+          </NuxtLink>
+          <button
+            type="button"
+            class="size-9 flex items-center justify-center rounded-md text-slate-600 dark:text-slate-300"
+            aria-label="Buka menu"
+            @click="mobileMenuOpen = !mobileMenuOpen"
+          >
           <svg v-if="!mobileMenuOpen" xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
           <svg v-else xmlns="http://www.w3.org/2000/svg" class="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
           </svg>
-        </button>
+          </button>
+        </div>
       </div>
 
       <nav v-if="mobileMenuOpen" class="sm:hidden border-t border-slate-200 dark:border-slate-800 px-4 py-3 space-y-1">

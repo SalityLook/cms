@@ -6,7 +6,7 @@ import { CapabilityError, NotFoundError, TransitionError, ValidationError } from
 import { hooks } from "../../hooks/hook-bus";
 import type { CapabilityKey } from "../../registry/capabilities";
 import { type ContentTypeDefinition, contentTypeRegistry } from "../../registry/content-types";
-import type { ContentDocument } from "../../shared/content-doc";
+import { extractPlainText, type ContentDocument } from "../../shared/content-doc";
 import type { Actor } from "../../shared/types";
 
 type ContentRow = typeof content.$inferSelect;
@@ -71,6 +71,7 @@ export class ContentService {
         title: input.title,
         excerpt: input.excerpt,
         content: input.content,
+        contentText: extractPlainText(input.content),
         authorId: actor.id,
         parentId: input.parentId,
         menuOrder: input.menuOrder,
@@ -98,7 +99,11 @@ export class ContentService {
 
     const [row] = await this.db
       .update(content)
-      .set({ ...input, updatedAt: new Date() })
+      .set({
+        ...input,
+        contentText: input.content ? extractPlainText(input.content) : undefined,
+        updatedAt: new Date()
+      })
       .where(eq(content.id, id))
       .returning();
 
@@ -222,6 +227,7 @@ export class ContentService {
         title: revision.title,
         excerpt: revision.excerpt,
         content: revision.content,
+        contentText: extractPlainText(revision.content),
         updatedAt: new Date()
       })
       .where(eq(content.id, id))
