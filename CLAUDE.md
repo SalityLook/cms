@@ -1910,6 +1910,64 @@ Typecheck/lint bersih di core/admin, `pnpm test` 29/29. Build+deploy
 **admin saja** (`pm2 restart selftaught-admin` — frontend/theme tidak
 disentuh fase ini), live, tenant lain tidak terganggu.
 
+### Phase 23 — Public REST API v1 (read-only + authenticated comments) (selesai)
+
+Scope SENGAJA lebih sempit dari full parity WP REST API: baca konten
+published, dan submit comment sebagai pemilik key yang terautentikasi.
+TIDAK ADA remote content-authoring sama sekali — itu permukaan keamanan
+jauh lebih besar (pada dasarnya expose ulang sebagian besar admin write
+API lewat key-auth), dibiarkan jadi fase terpisah eksplisit kalau memang
+dibutuhkan nanti, bukan diam-diam masuk ke fase ini.
+
+Tabel baru `api_keys`: key berformat `<keyId>.<secret>` supaya verifikasi
+cukup lookup SATU row by `keyId` (unique, indexed) lalu argon2-verify
+secretHash row itu saja — bukan `argon2.verify()` terhadap SEMUA key di
+tabel. Raw key di-return SEKALI SAJA saat create (`ApiKeyService.create()`)
+dan tidak pernah disimpan/bisa diambil lagi, pola sama recovery code TOTP
+(Phase 22). `scopes` kolom jsonb sungguhan tapi BELUM di-enforce di mana
+pun — semua key valid+belum-revoked bisa hit semua endpoint v1; disimpan
+sebagai schema sekarang supaya penyempitan surface nanti tidak butuh
+migration baru.
+
+Middleware baru `apps/frontend/server/middleware/api-auth.ts` resolve
+`Authorization: Bearer <key>` jadi `event.context.apiKey` (userId,
+scopes, Actor) HANYA untuk path `/api/v1/**` — route lain di app ini
+tidak tersentuh. Key hilang/invalid TIDAK ditolak di middleware itu
+sendiri (kebanyakan endpoint v1 sengaja terbuka tanpa key); cuma
+`POST /api/v1/comments` cek `event.context.apiKey` dan 401 kalau kosong.
+
+Endpoint baca baru `GET /api/v1/{posts,posts/:slug,pages/:slug,categories,tags}`
+— status di-hardcode `"published"` LANGSUNG di query, TANPA query
+parameter/header/scope APA PUN yang bisa mengubahnya, jadi tidak ada
+kombinasi yang bisa munculkan draft/scheduled/trashed, auth atau tidak.
+`POST /api/v1/comments` butuh key valid, atribusi ke user PEMILIK key
+(displayName/email/id, bukan field freeform), rate-limited PER-API-KEY
+(bukan per-IP/email — integrasi legit bisa share egress IP dengan
+traffic lain).
+
+Admin UI: card baru "API Keys" di `/account` (halaman self-service Phase
+22) — generate (raw key tampil sekali), list (label, terakhir dipakai,
+status revoked), revoke. `docs/api.md` baru ditulis tangan (tanpa
+tooling OpenAPI di project ini, konsisten gaya dokumentasi
+README-centric) — jelaskan tiap endpoint DAN eksplisit apa yang
+TIDAK PERNAH dilakukan API ini.
+
+**Diverifikasi runtime**: generate key → publish 1 post + biarkan 1
+draft → `GET /api/v1/posts`/`posts/:slug` jalan tanpa auth untuk yang
+published, 404 untuk draft → **ulangi request slug draft DENGAN key
+terautentikasi (owner PUNYA edit_posts, kasus privilege TERKUAT yang
+sengaja dipilih) plus variasi query param (`?status=draft`, dst) →
+draft TETAP ABSEN di SEMUA kombinasi, auth atau tidak** → `POST
+/api/v1/comments` tanpa key → 401, dengan key → sukses, atribusi benar
+ke user pemilik key di tabel comments → revoke key → request berikutnya
+dengan key yang sama langsung 401 → key kedua kena rate limit PERSIS di
+percobaan ke-21 (limit 20/15menit per-key). Cleanup total (content/
+comments 0, user QA terhapus — `api_keys` row-nya ikut cascade-delete,
+dikonfirmasi 0 sisa). Typecheck/lint bersih di core/admin/frontend,
+`pnpm test` 29/29. Build kedua app + `pm2 restart` — live di kedua
+domain (termasuk request nyata ke `/api/v1/categories` produksi), tenant
+lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
