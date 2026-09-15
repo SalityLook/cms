@@ -1564,6 +1564,64 @@ count 0, kedua user QA terhapus). Typecheck/lint bersih di core/admin,
 selftaught-admin` — frontend/theme tidak disentuh fase ini), live, tenant
 lain tidak terganggu.
 
+### Phase 17 — Reusable blocks, model SYNCED (selesai)
+
+**Fase terbesar di batch ini** — user secara eksplisit memilih model
+SYNCED reference (bukan detached-copy yang lebih sederhana yang tadinya
+saya rekomendasikan) sewaktu diskusi plan-mode: edit sumber HARUS langsung
+berubah di semua post yang memakainya, tanpa perlu save ulang post itu.
+
+Tabel baru `reusable_blocks` (title, content jsonb, createdBy) dan
+`reusable_block_usages` (junction, `(reusableBlockId, contentId)` unique).
+Usage tracking dilakukan sebagai **plain table write LANGSUNG di dalam
+`ContentService.create()/update()/duplicate()/restoreRevision()`**
+(method privat baru `syncReusableBlockUsages()`, didukung
+`extractReusableBlockRefs()` baru di `shared/content-doc.ts`) — SENGAJA
+BUKAN lewat dependency `ReusableBlockService` yang di-inject ke
+`ContentService` (constructor `ContentService` tidak berubah), karena
+akurasi tabel usage ini penting di SEMUA jalur tulis content, dan
+`ReusableBlockService.delete()` bergantung penuh padanya untuk menolak
+hapus block yang masih dipakai.
+
+**Inti model SYNCED**: `ReusableBlockService.resolveDocument(doc)` jalan
+tree dan, di tiap node `reusableBlockRef`, splice konten block yang
+DIBACA LANGSUNG DARI DB SAAT ITU (rekursif, dengan cycle guard) — bukan
+value yang di-cache di json `content` milik post. Ini jalan di
+`GET /api/posts/[slug]`/`GET /api/pages/[slug]` (`apps/frontend`) —
+begitu sampai ke browser, TIDAK ADA lagi node `reusableBlockRef` di
+dokumennya sama sekali, jadi TIDAK PERLU render component/entry
+`BlockRegistry` publik untuk tipe block ini.
+`ReusableBlockService.update()` (`PUT /api/reusable-blocks/[id]`) adalah
+jalur tulis "Edit sumber" — nulis langsung ke `reusable_blocks`, TIDAK
+lewat save post yang mereferensikannya.
+
+Admin editor: Tiptap Node extension baru (`reusableBlockRef`, atom,
+`apps/admin/app/components/reusable-block-extension.ts`) dengan Vue
+NodeView (`ReusableBlockNodeView.vue`) yang fetch+preview konten block
+CURRENT read-only (reuse `BlockRenderer` dari `@selftaught/blocks`) di
+dalam container bertanda "tersinkron", plus tombol "Edit sumber" yang
+buka `USlideover` dengan instance `BlockEditor` sendiri yang nulis
+langsung ke block (skip save post sama sekali). `BlockEditor.vue` dapat 2
+toolbar action baru: "Simpan sebagai reusable block" (capture selection
+Tiptap via `state.doc.cut(from,to)`, POST jadi block baru, ganti selection
+di tempat jadi node reference) dan "Sisipkan reusable block" (picker list
+block yang sudah ada). Halaman admin baru `/reusable-blocks` (list+usage
+count per block+rename+hapus) + entry sidebar "Reusable Blocks".
+
+**Diverifikasi runtime — bukti nyata model SYNCED, bukan diasumsikan**:
+buat block "CTA Banner" → referensikan dari 2 post published berbeda →
+`GET /api/posts/[slug]` KEDUANYA resolve+splice konten block dengan benar,
+SSR HTML keduanya benar-benar berisi teks hasil resolve → **edit block
+lewat `PUT /api/reusable-blocks/[id]` (TIDAK sentuh post sama sekali) →
+KEDUA post langsung reflect teks baru di request berikutnya** — bukti
+utama yang membedakan dari detached-copy → guard hapus: ditolak selagi 2
+post masih referensi → lepas referensi 1 post → masih ditolak (tersisa 1)
+→ lepas semua → hapus sukses. Cleanup total (`content`/
+`reusable_blocks`/`reusable_block_usages` count 0, user QA terhapus).
+Typecheck/lint bersih di core/admin/frontend, `pnpm test` 29/29. Build
+kedua app + `pm2 restart` — live di kedua domain, tenant lain tidak
+terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
