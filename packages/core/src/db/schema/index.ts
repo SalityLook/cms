@@ -3,6 +3,7 @@ export * from "./comments";
 export * from "./content";
 export * from "./media";
 export * from "./menus";
+export * from "./oembed";
 export * from "./plugins";
 export * from "./reusable-blocks";
 export * from "./revisions";

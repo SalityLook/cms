@@ -4,17 +4,63 @@ import Image from "@tiptap/extension-image";
 import StarterKit from "@tiptap/starter-kit";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import { watch } from "vue";
+import { EmbedBlock } from "./embed-extension";
 import { ReusableBlockRef } from "./reusable-block-extension";
 
 const props = defineProps<{ modelValue: ContentDocument }>();
 const emit = defineEmits<{ "update:modelValue": [ContentDocument] }>();
 
+// Loose client-side check just to decide whether to intercept a paste at
+// all -- the real allowlist (and the only one that actually matters
+// security-wise) is server-side in OembedService.matchProvider().
+const EMBEDDABLE_URL_PATTERN =
+  /^https?:\/\/(www\.)?(youtube\.com\/watch|youtu\.be\/|vimeo\.com\/|soundcloud\.com\/|codepen\.io\/)/i;
+
+async function insertEmbedFromUrl(url: string, insertAt?: number) {
+  const e = editor.value;
+  if (!e) return;
+  try {
+    const result = await apiFetch<{ html: string; providerName: string }>("/api/oembed", {
+      method: "POST",
+      body: { url }
+    });
+    const attrs = { url, html: result.html, providerName: result.providerName };
+    if (insertAt === undefined) {
+      e.chain().focus().insertContent({ type: "embed", attrs }).run();
+    } else {
+      e.chain().focus().insertContentAt(insertAt, { type: "embed", attrs }).run();
+    }
+  } catch {
+    // Graceful fallback -- an unsupported/failed URL becomes a plain link,
+    // never a broken block.
+    if (insertAt === undefined) {
+      e.chain().focus().insertContent(`<a href="${url}">${url}</a>`).run();
+    } else {
+      e.chain().focus().insertContentAt(insertAt, `<a href="${url}">${url}</a>`).run();
+    }
+  }
+}
+
+function insertEmbedManually() {
+  const url = window.prompt("URL untuk di-embed (YouTube, Vimeo, SoundCloud, atau CodePen):");
+  if (url) insertEmbedFromUrl(url);
+}
+
 const editor = useEditor({
   content: props.modelValue,
-  extensions: [StarterKit, Image, ReusableBlockRef],
+  extensions: [StarterKit, Image, ReusableBlockRef, EmbedBlock],
   editorProps: {
     attributes: {
       class: "prose prose-slate dark:prose-invert max-w-none focus:outline-none min-h-[18rem] px-4 py-3"
+    },
+    handlePaste: (view, event) => {
+      const text = event.clipboardData?.getData("text/plain")?.trim();
+      if (!text || !EMBEDDABLE_URL_PATTERN.test(text)) {
+        return false;
+      }
+      event.preventDefault();
+      insertEmbedFromUrl(text, view.state.selection.from);
+      return true;
     }
   },
   onUpdate: ({ editor: instance }) => {
@@ -123,6 +169,9 @@ const toolbarGroups = computed<ToolbarButton[][]>(() => {
     [
       { icon: "i-lucide-save", label: "Simpan sebagai reusable block", active: () => false, action: saveAsReusableBlock },
       { icon: "i-lucide-blocks", label: "Sisipkan reusable block", active: () => false, action: openInsertPicker }
+    ],
+    [
+      { icon: "i-lucide-clapperboard", label: "Sisipkan embed", active: () => false, action: insertEmbedManually }
     ],
     [
       { icon: "i-lucide-undo-2", label: "Undo", active: () => false, action: () => e.chain().focus().undo().run() },
