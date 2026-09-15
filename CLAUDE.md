@@ -1669,6 +1669,58 @@ Typecheck/lint bersih di core/admin, `pnpm test` 29/29. Build+deploy
 **admin saja** (`pm2 restart selftaught-admin` — frontend/theme tidak
 disentuh fase ini), live, tenant lain tidak terganggu.
 
+### Phase 19 — Self-registration + public author profiles (selesai)
+
+Implementasi paket yang sudah disetujui user eksplisit di plan-mode: session
+`apps/frontend` TERPISAH total dari admin, role baru 0-capability sebagai
+default self-registration yang aman, dan admin login menolak akun
+0-capability di boundary login (bukan di action).
+
+- `nuxt-auth-utils` dipasang sebagai instance module SENDIRI di
+  `apps/frontend` — cookie name sendiri (`selftaught-frontend-session`,
+  beda dari default admin `nuxt-session`) + secret sendiri
+  (`NUXT_FRONTEND_SESSION_PASSWORD`, terpisah dari `NUXT_SESSION_PASSWORD`
+  admin). Nama cookie beda ini penting BUKAN cuma di produksi (subdomain
+  beda otomatis isolasi cookie) tapi JUSTRU lebih penting di dev lokal
+  (kedua app jalan di host yang sama, cookie TIDAK port-scoped — nama sama
+  akan diam-diam collision).
+- `SYSTEM_ROLES.subscriber` baru (0 capability) — setara "Subscriber"
+  WordPress, default aman untuk siapa saja yang self-register.
+  `apps/admin/server/api/auth/login.post.ts` sekarang resolve capability
+  actor SETELAH verify credential, tolak 403 kalau kosong SEBELUM
+  `setUserSession` — akun subscriber ditolak dari awal, bukan diizinkan
+  masuk lalu 403 di setiap action.
+- `users` dapat kolom `bio`/`avatarMediaId` (soft reference tanpa FK,
+  pattern sama `content.featuredMediaId`, Gotcha #12)/`slug` (unique).
+  `UserService.create()` SEKARANG SELALU generate slug unik dari
+  displayName (algoritma slugify sama seperti posts/pages) untuk SEMUA
+  user (self-registered ATAU dibuat admin) — jadi `/author/[slug]` selalu
+  punya sesuatu untuk di-link.
+- Settings baru (tanpa migrasi): `allowSelfRegistration` (default
+  **false** — registrasi terbuka di situs sekolah itu magnet spam),
+  `selfRegistrationDefaultRole`. Card baru di admin `/settings`.
+- Endpoint baru `apps/frontend`: `POST /api/register` (rate-limited
+  5/jam/IP, gated setting di atas), `POST/DELETE /api/auth/{login,logout}`
+  (guard KEBALIKAN dari login admin — di sini SENGAJA menyambut akun
+  0-capability), `GET/PUT /api/account/profile` (protected
+  `requireUserSession`), `GET /api/author/[slug]` (publik, `ContentService`
+  dapat filter `authorId` baru, cuma post published).
+- Halaman baru `themes/default`: `login.vue`, `register.vue`,
+  `account/profile.vue` (protected via middleware auth versi frontend baru,
+  mirror punya admin), `author/[slug].vue`.
+
+**Diverifikasi runtime**: registrasi ditolak 403 selagi setting off →
+admin nyalakan → registrasi sukses, DB konfirmasi role `subscriber`, 0
+capability → akun itu DITOLAK (403) login ke API admin → login ke situs
+PUBLIK sukses → edit bio → `/author/[slug]` reflect → terpisah, sebagai
+QA admin publish 1 post + biarkan 1 draft → `/author/[slug]` admin cuma
+list yang published → logout → `/account/profile` redirect `/login`.
+Cleanup total (content count 0, kedua akun QA terhapus, setting
+`allowSelfRegistration` dikembalikan ke false). Typecheck/lint bersih di
+core/admin/frontend, `pnpm test` 29/29. Build kedua app + CSS bundle
+re-check (Gotcha #21, 72KB→72.6KB) + `pm2 restart` — live di kedua
+domain, tenant lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
