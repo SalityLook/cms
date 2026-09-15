@@ -1275,18 +1275,25 @@ satu Postgres yang sama). Build ulang + `pm2 restart` — dikonfirmasi live.
 
 ## Rencana kesetaraan fitur WordPress (Pekerjaan pasca-roadmap #10-24)
 
-User minta analisis fitur WordPress yang belum dimiliki CMS ini, lalu minta
-rencana untuk menutup gap itu SEMUA native di core (tanpa plugin eksternal)
-— CMS ini diposisikan sebagai platform yang di-install per VPS/hosting
-(bukan SaaS multi-tenant), modern/ringan/powerful. Rencana lengkap 15 fase
-(Phase 10-24) ada di `/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md`
-bagian "Rencana lanjutan: Kesetaraan fitur WordPress tanpa plugin eksternal"
-— WAJIB dibaca sebelum lanjut ke fase mana pun, berisi keputusan arsitektur
-yang sudah dikonfirmasi user (reusable blocks pakai model SYNCED bukan
+**STATUS: SEMUA 15 FASE (Phase 10-24) SELESAI.** User minta analisis fitur
+WordPress yang belum dimiliki CMS ini, lalu minta rencana untuk menutup
+gap itu SEMUA native di core (tanpa plugin eksternal) — CMS ini
+diposisikan sebagai platform yang di-install per VPS/hosting (bukan SaaS
+multi-tenant), modern/ringan/powerful. Rencana lengkap 15 fase ada di
+`/root/.claude/plans/saya-ingin-membangun-sebuah-tingly-spring.md` bagian
+"Rencana lanjutan: Kesetaraan fitur WordPress tanpa plugin eksternal" —
+masih berguna dibaca sebagai referensi keputusan arsitektur yang sudah
+dikonfirmasi user (reusable blocks pakai model SYNCED bukan
 detached-copy, self-registration dengan role `subscriber` 0-capability +
 session terpisah, i18n di-skip, multisite TIDAK dibangun — runbook clone-
-deploy sebagai gantinya) plus ground-truth findings dan dependency baru
-yang perlu ditambahkan tiap fase.
+deploy sebagai gantinya). CMS ini sekarang punya SEMUA fitur yang
+direncanakan: search full-text, custom menus, duplicate content, reusable
+blocks tersinkron, autosave+revision diff, self-registration+profil
+publik, import/export (JSON+WXR), plugin/theme toggle, 2FA TOTP, REST API
+publik v1, dan oEmbed — di atas fondasi Phase 0-7 dan pekerjaan
+pasca-roadmap #1-9 sebelumnya. Item yang SENGAJA tidak dibangun (i18n,
+multisite sungguhan) didokumentasikan di bagian "Item yang sengaja TIDAK
+dibangun" di plan file, bukan terlewat.
 
 ### Phase 10 — Admin list search/filter/pagination/bulk actions (selesai)
 
@@ -1967,6 +1974,68 @@ dikonfirmasi 0 sisa). Typecheck/lint bersih di core/admin/frontend,
 `pnpm test` 29/29. Build kedua app + `pm2 restart` — live di kedua
 domain (termasuk request nyata ke `/api/v1/categories` produksi), tenant
 lain tidak terganggu.
+
+### Phase 24 — oEmbed (allowlist, sanitized, cached) (selesai — FASE TERAKHIR dari 15 fase)
+
+Tabel baru `oembed_cache` (`url` unique, `providerName`, `html`) —
+resolve SEKALI per URL, tidak pernah di-fetch ulang saat render/edit
+berikutnya (response oEmbed stabil, dan hammer provider tiap page view
+gampang kena rate-limit mereka).
+
+`OembedService.resolve()` allowlist-only (YouTube, Vimeo, SoundCloud,
+CodePen) lewat protokol oEmbed ASLI (endpoint oEmbed sungguhan tiap
+provider), BUKAN discovery terbuka ke domain arbitrary. Twitter/X SENGAJA
+di-exclude: model embed-nya butuh script `platform.js` termuat untuk
+render, dan tidak ada cara meng-allow itu bersih di bawah aturan
+"iframe-only, sanitize yang disimpan" tanpa harus percaya script pihak
+ketiga MENTAH-MENTAH atau strip tag `<script>`-nya (yang bikin embed-nya
+rusak).
+
+**Bagian security-critical, dinyatakan sebagai requirement bukan
+tempelan**: `sanitizeEmbedHtml()` baru strip `<script>...</script>` dan
+attribute event-handler inline (`onload=`, `onerror=`, dst) dari response
+provider SEBELUM pernah ditulis ke `oembed_cache` ATAU ke `content` json
+post — render (`Embed.vue` baru di `@selftaught/blocks`, dipakai admin
+NodeView preview MAUPUN `BlockRenderer` publik) TIDAK PERNAH fetch ulang
+atau sanitize ulang saat render, cuma percaya yang sudah dibersihkan saat
+resolve. **Dieksekusi dengan test negatif SUNGGUHAN**: `sanitizeEmbedHtml()`
+dipanggil LANGSUNG dengan `<script>alert(1)</script>` + attribute
+`onerror=` yang dirangkai bersama `<iframe>` legit, konfirmasi KEDUA
+bagian jahat ke-strip sementara iframe-nya tetap utuh — bukan diasumsikan
+aman cuma karena provider allowlist "seharusnya" tidak pernah balikin itu.
+
+Admin editor: Tiptap atom node baru (`embed`, `EmbedNodeView.vue`,
+`apps/admin/app/components/embed-extension.ts`) — attrs html/providerName
+ditangkap SELURUHNYA saat insert, node-nya sendiri TIDAK PERNAH fetch apa
+pun saat edit atau render. `BlockEditor.vue` dapat `handlePaste` hook yang
+kenali URL bare ter-paste cocok provider allowlist (cek client-side
+LONGGAR saja — allowlist sungguhan yang otoritatif tetap server-side di
+`OembedService.matchProvider()`), resolve lewat `POST /api/oembed`,
+sisipkan node embed di tempat teks yang di-paste; toolbar "Sisipkan
+embed" tawarkan jalur manual sama via prompt URL. KEDUA jalur fallback ke
+plain `<a>` link kalau resolusi gagal apa pun (provider tidak didukung,
+network error) — bukan block rusak.
+
+**Diverifikasi runtime**: resolve URL YouTube ASLI lewat endpoint oEmbed
+live sungguhan, dapat HTML iframe asli → konfirmasi tersimpan di
+`oembed_cache` dan resolve ULANG url yang SAMA jadi cache hit ~38ms
+(bukan network round-trip kedua) → URL tidak didukung (example.com) →
+400 "Unsupported embed provider" graceful, bukan crash → bikin post
+dengan embed block hasil resolve, publish, konfirmasi SSR halaman post
+PUBLIK berisi `<iframe>` YouTube ASLI yang playable dengan src benar →
+konfirmasi halaman editor admin tetap 200 (tidak crash) dengan konten
+embed ada — konten hasil render Tiptap NodeView adalah client-side-only
+mount (limitasi sama seperti NodeView `ReusableBlockRef` Phase 17), jadi
+test negatif/fungsional fase ini dijalankan terhadap service layer dan
+render SSR publik, yaitu tempat garansi security dan konten sungguhan
+berada. Cleanup total (post test + row `oembed_cache` balik ke 0, user QA
+terhapus). Typecheck/lint bersih di core/blocks/admin/frontend, `pnpm
+test` 29/29. Build kedua app + `pm2 restart` — live di kedua domain,
+tenant lain tidak terganggu.
+
+**Ini menutup Phase 24, fase TERAKHIR dari rencana 15 fase (Phase
+10-24) yang disetujui sesi ini** — lihat bagian "Rencana kesetaraan
+fitur WordPress" di atas untuk arc lengkap dari Phase 10 sampai sini.
 
 ## Git
 
