@@ -1384,6 +1384,40 @@ tersisa** (bukti nyata upsert fix, bukan cuma "compile lolos") → SSR panel
 render di post DAN page editor → cleanup total (`content_meta` cascade
 ikut terhapus). Typecheck/lint/test bersih. Deploy admin — live.
 
+### Phase 13 — Comments (moderasi, threaded reply, rate-limited) (selesai)
+
+Tabel baru `comments` (`contentId` FK cascade, `parentId` self-ref 1 level
+threaded reply — pattern sama `terms.parentId`, `authorName/authorEmail/
+authorUserId?`, `body`, `status` enum pending/approved/spam/trash,
+`authorIp/userAgent`). Capability baru `moderate_comments` — masuk
+`admin`+`editor` di `SYSTEM_ROLES`, WAJIB re-run `pnpm db:seed` di database
+yang sudah pernah di-seed sebelumnya supaya capability baru ke-grant (sudah
+dijalankan+diverifikasi). `CommentService.create()` (jalur publik) SENGAJA
+paranoid — cek ULANG langsung status `content` target `published` (tidak
+percaya caller), jadi comment ke draft/scheduled/trashed mustahil walau ID
+ditebak.
+
+`apps/frontend` dapat `server/utils/rate-limit.ts` sendiri (duplikat dari
+admin — proses Nitro terpisah, tidak bisa share Map in-memory) +
+`POST /api/comments` (5/15menit/IP). `GET /api/posts/[slug]` sekarang
+resolve comment approved + flag `commentsEnabled` (setting baru, generic
+key/value, tanpa migrasi). Komponen theme baru: `CommentList.vue`
+(rekursif untuk nested reply, pattern sama `BlockRenderer.vue`, Gotcha
+#10), `CommentForm.vue` (Tailwind polos, tanpa Nuxt UI). Admin: `/comments`
+pakai pattern `AdminDataTable`/bulk-action dari Phase 10, toggle setting
+baru `commentsEnabled`/`commentsRequireApproval` di Settings.
+
+**Diverifikasi runtime**: enable comments → submit publik ke post
+published → pending, absen dari halaman publik → admin approve → tampil →
+reply threaded → approve → **SSR render nesting benar** → submit ke draft
+→ 404 nyata → mark spam → hilang dari publik, tetap kelihatan admin kalau
+filter `?status=spam` eksplisit → rate limit kena di percobaan ke-3 (bukan
+ke-6, karena traffic test sebelumnya dari IP yang sama sudah makan
+sebagian kuota 5/15menit — perilaku BENAR, bukan bug). Cleanup total
+(cascade delete `comments` ikut terhapus tanpa disentuh langsung).
+Typecheck/lint/test bersih, CSS bundle re-check (67KB→71KB, Gotcha #21).
+Deploy kedua app — live.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
