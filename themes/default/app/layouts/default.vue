@@ -1,4 +1,12 @@
 <script setup lang="ts">
+interface ResolvedMenuItem {
+  id: string;
+  label: string;
+  url: string;
+  openInNewTab: boolean;
+  children: ResolvedMenuItem[];
+}
+
 const mobileMenuOpen = ref(false);
 const route = useRoute();
 
@@ -9,10 +17,17 @@ watch(
   }
 );
 
-const navLinks = [
-  { label: "Beranda", to: "/" },
-  { label: "Blog", to: "/blog" }
+const fallbackNavLinks: ResolvedMenuItem[] = [
+  { id: "fallback-home", label: "Beranda", url: "/", openInNewTab: false, children: [] },
+  { id: "fallback-blog", label: "Blog", url: "/blog", openInNewTab: false, children: [] }
 ];
+const fallbackFooterLinks: ResolvedMenuItem[] = fallbackNavLinks;
+
+const { data: primaryMenu } = await useFetch<ResolvedMenuItem[]>("/api/menus/primary");
+const { data: footerMenu } = await useFetch<ResolvedMenuItem[]>("/api/menus/footer");
+
+const navLinks = computed(() => (primaryMenu.value && primaryMenu.value.length > 0 ? primaryMenu.value : fallbackNavLinks));
+const footerLinks = computed(() => (footerMenu.value && footerMenu.value.length > 0 ? footerMenu.value : fallbackFooterLinks));
 </script>
 
 <template>
@@ -26,8 +41,9 @@ const navLinks = [
         <nav class="hidden sm:flex items-center gap-8">
           <NuxtLink
             v-for="link in navLinks"
-            :key="link.to"
-            :to="link.to"
+            :key="link.id"
+            :to="link.url"
+            :target="link.openInNewTab ? '_blank' : undefined"
             class="text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
             active-class="!text-brand-600 dark:!text-brand-400"
           >
@@ -53,8 +69,9 @@ const navLinks = [
       <nav v-if="mobileMenuOpen" class="sm:hidden border-t border-slate-200 dark:border-slate-800 px-4 py-3 space-y-1">
         <NuxtLink
           v-for="link in navLinks"
-          :key="link.to"
-          :to="link.to"
+          :key="link.id"
+          :to="link.url"
+          :target="link.openInNewTab ? '_blank' : undefined"
           class="block rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-900"
           active-class="!text-brand-600 dark:!text-brand-400 bg-brand-50 dark:bg-brand-950"
         >
@@ -71,8 +88,15 @@ const navLinks = [
       <div class="max-w-5xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
         <p>© {{ new Date().getFullYear() }} SelfTaught CMS. Dibangun dengan Nuxt.</p>
         <div class="flex items-center gap-6">
-          <NuxtLink to="/" class="hover:text-slate-900 dark:hover:text-white transition-colors">Beranda</NuxtLink>
-          <NuxtLink to="/blog" class="hover:text-slate-900 dark:hover:text-white transition-colors">Blog</NuxtLink>
+          <NuxtLink
+            v-for="link in footerLinks"
+            :key="link.id"
+            :to="link.url"
+            :target="link.openInNewTab ? '_blank' : undefined"
+            class="hover:text-slate-900 dark:hover:text-white transition-colors"
+          >
+            {{ link.label }}
+          </NuxtLink>
         </div>
       </div>
     </footer>

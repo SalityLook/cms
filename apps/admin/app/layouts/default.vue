@@ -22,6 +22,7 @@ const contentNav: NavItem[] = [
 ];
 
 const manageNav: NavItem[] = [
+  { label: "Menus", to: "/menus", icon: "i-lucide-menu" },
   { label: "Users", to: "/users", icon: "i-lucide-users" },
   { label: "Roles", to: "/roles", icon: "i-lucide-shield" },
   { label: "Settings", to: "/settings", icon: "i-lucide-settings" }

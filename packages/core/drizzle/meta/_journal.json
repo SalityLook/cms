@@ -57,6 +57,13 @@
       "when": 1789366388328,
       "tag": "0007_plain_human_fly",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1789443828332,
+      "tag": "0008_messy_speed_demon",
+      "breakpoints": true
     }
   ]
 }

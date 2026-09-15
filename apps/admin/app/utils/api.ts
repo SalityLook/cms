@@ -170,6 +170,26 @@ export interface CommentSummary {
   createdAt: string;
 }
 
+export interface MenuSummary {
+  id: string;
+  key: string;
+  name: string;
+}
+
+export type MenuItemLinkType = "custom" | "content";
+
+export interface MenuItemSummary {
+  id: string;
+  menuId: string;
+  parentId: string | null;
+  label: string;
+  linkType: MenuItemLinkType;
+  customUrl: string | null;
+  contentId: string | null;
+  sortOrder: number;
+  openInNewTab: boolean;
+}
+
 export type UserStatus = "active" | "suspended";
 
 export interface UserSummary {

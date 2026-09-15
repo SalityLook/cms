@@ -14,7 +14,8 @@ export const CAPABILITIES = [
   "manage_users",
   "manage_settings",
   "manage_plugins",
-  "moderate_comments"
+  "moderate_comments",
+  "manage_menus"
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number];
@@ -65,7 +66,8 @@ export const SYSTEM_ROLES = {
       "edit_pages",
       "manage_media",
       "manage_categories",
-      "moderate_comments"
+      "moderate_comments",
+      "manage_menus"
     ] satisfies CapabilityKey[]
   },
   author: {
