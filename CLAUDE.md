@@ -1622,6 +1622,53 @@ Typecheck/lint bersih di core/admin/frontend, `pnpm test` 29/29. Build
 kedua app + `pm2 restart` — live di kedua domain, tenant lain tidak
 terganggu.
 
+### Phase 18 — Autosave + revision diff (selesai)
+
+Autosave mayoritas wiring: `revisions.revisionType` sudah punya nilai
+`"autosave"` sejak Phase 4, tidak pernah dipakai.
+`RevisionService.upsertAutosave()` jaga PERSIS 1 row autosave per content
+(delete-then-insert, bukan partial unique index — realistis cuma 1 editor
+aktif per waktu). `ContentService.autosave(actor, id, input)` baru
+SENGAJA terpisah dari `update()` — TIDAK sentuh row `content` utama
+(title/slug/updatedAt), supaya tidak ganggu save manual concurrent atau
+urutan "Diperbarui" di list. Endpoint baru `PUT /api/posts/[id]/autosave`
+(+pages) + `GET .../revisions/autosave`. Editor (`posts/[id].vue`,
+`pages/[id].vue`) polling 30 detik via `setInterval`, cuma PUT kalau
+snapshot title/excerpt/content beda dari save/autosave terakhir — indikator
+"Tersimpan otomatis pukul HH:MM" di sebelah tombol Simpan. Panel Revisions
+dapat callout "Pulihkan dari autosave" kalau ada autosave lebih baru dari
+save manual terakhir (reuse `restoreRevision` yang sudah ada — autosave
+cuma revision row bertag beda).
+
+Revision diff: `RevisionService.diffDocuments()` baru jalan `diffWords`
+(dependency baru `diff`/jsdiff di `packages/core`) atas hasil
+`extractPlainText()` (Phase 15) dari 2 dokumen. Diff jalan SERVER-SIDE
+penuh di `GET /api/posts/[id]/revisions/diff?from=&to=` (+pages, `to`
+terima id revisi ATAU literal `"current"` untuk diff ke row content
+live) — supaya `diff` tidak pernah masuk client bundle. Tombol "Diff" baru
+di tiap baris revisi, buka `USlideover` render strikethrough/underline.
+
+**Bug nyata ketemu dari verifikasi SSR, BUKAN typecheck/lint (keduanya
+hijau)**: draft pertama nulis `autosaveInterval = setInterval(...)`
+langsung di top-level `<script setup>` — Nuxt SSR juga menjalankan kode
+level itu di server dan MENOLAK EKSPLISIT ("`setInterval` should not be
+used on the server") — SEMUA `GET` halaman editor post/page jadi 500.
+Fix: pindahkan `setInterval` ke dalam `onMounted()`. Kesalahan sekelas
+sama dengan peringatan Gotcha #17 soal jangan percaya typecheck/lint di
+atas request SSR sungguhan.
+
+**Diverifikasi runtime**: save manual post ("Hello world", revision v1
+snapshot) → panggil endpoint autosave 2× beda konten → DB konfirmasi PERSIS
+1 row bertag `autosave` isi teks PALING BARU, terpisah total dari row
+`revision` manual (tidak terganggu) → restore dari autosave → konten live
+cocok → diff revisi "Hello world" vs state "Hello brave new world" (kata
+persis dari plan) → **"brave new" ke-flag sebagai addition**, sisanya
+tidak berubah → SSR kedua halaman editor benar setelah fix `setInterval`.
+Cleanup total (`content`/`revisions` count 0, user QA terhapus).
+Typecheck/lint bersih di core/admin, `pnpm test` 29/29. Build+deploy
+**admin saja** (`pm2 restart selftaught-admin` — frontend/theme tidak
+disentuh fase ini), live, tenant lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
