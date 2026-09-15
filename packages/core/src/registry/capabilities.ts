@@ -15,7 +15,8 @@ export const CAPABILITIES = [
   "manage_settings",
   "manage_plugins",
   "moderate_comments",
-  "manage_menus"
+  "manage_menus",
+  "manage_import_export"
 ] as const;
 
 export type CapabilityKey = (typeof CAPABILITIES)[number];

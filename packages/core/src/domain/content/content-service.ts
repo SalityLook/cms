@@ -245,6 +245,26 @@ export class ContentService {
     return published;
   }
 
+  /**
+   * System-level, no actor/capability check (same posture as
+   * publishDueScheduled()) -- used by ImportService to restore a content
+   * row's original status/publishedAt after create() (which always starts
+   * a new row as "draft" regardless of what status it's being imported at).
+   * Deliberately bypasses ALLOWED_TRANSITIONS -- import is a trusted bulk
+   * restore, not a user-driven workflow transition.
+   */
+  async setStatusUnchecked(id: string, status: ContentStatus, publishedAt: Date | null): Promise<ContentRow> {
+    const [row] = await this.db
+      .update(content)
+      .set({ status, publishedAt, updatedAt: new Date() })
+      .where(eq(content.id, id))
+      .returning();
+    if (!row) {
+      throw new Error("Failed to set content status");
+    }
+    return row;
+  }
+
   async restoreRevision(actor: Actor, id: string, revisionId: string): Promise<ContentRow> {
     const existing = await this.requireExisting(id);
     const definition = this.requireContentType(existing.type);

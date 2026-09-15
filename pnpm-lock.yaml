@@ -304,6 +304,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(gel@2.2.0(supports-color@10.2.2))(postgres@3.4.9)
+      fast-xml-parser:
+        specifier: ^4.5.7
+        version: 4.5.7
       postgres:
         specifier: ^3.4.5
         version: 3.4.9
@@ -3826,6 +3829,10 @@ packages:
   fast-wrap-ansi@0.2.2:
     resolution: {integrity: sha512-7F2Fl+TjRSenLqlU3UjSH0iyqopqoZIu7eZVpEirP2g1GtWa2G/ecEmBdgz31+Mxr+ELclgg6sokpSFIQiZ02Q==}
 
+  fast-xml-parser@4.5.7:
+    resolution: {integrity: sha512-a6Qh1RMCNbSrU1+sAyAAZH3rTe+OaWJbNZIq0S+ifZciUUOQtlVxBJwoTUE2bYhysmG/RYyI5WJFIKdBahJdrQ==}
+    hasBin: true
+
   fastq@1.20.3:
     resolution: {integrity: sha512-XKv5nnLs6nLF71NgiKJLIZFLkPyIEuOselLG7ujZnGrRfQK8HpvY+WqKhAJUAdLomwVHErVS4LfxFlPq0/FTAw==}
 
@@ -5513,6 +5520,9 @@ packages:
 
   strip-literal@4.0.0:
     resolution: {integrity: sha512-PaqAvfUZKBwc/SLmNZtHmzK+v19Z4O4eS3cKPeGvbIv/U3pnyEq4Tuw3/4v/FwfM8VQaEawsyCcOQ0P+kpwWWw==}
+
+  strnum@1.1.2:
+    resolution: {integrity: sha512-vrN+B7DBIoTTZjnPNewwhx6cBA/H+IS7rfW68n7XxC1y7uoiGQBxaKzqucGUgavX15dJgiGztLJ8vxuEzwqBdA==}
 
   structured-clone-es@2.0.1:
     resolution: {integrity: sha512-10ZL5r77LhknxlP1FBiCW+VdnuWOEFLdSS2SKtjyEV+L4qP1hUEIMIZW94LC3jKxRmT/Dj7KkD1mqh/IY6lhKQ==}
@@ -9935,6 +9945,10 @@ snapshots:
     dependencies:
       fast-string-width: 3.0.2
 
+  fast-xml-parser@4.5.7:
+    dependencies:
+      strnum: 1.1.2
+
   fastq@1.20.3:
     dependencies:
       reusify: 1.1.0
@@ -11871,6 +11885,8 @@ snapshots:
   strip-literal@4.0.0:
     dependencies:
       js-tokens: 10.0.0
+
+  strnum@1.1.2: {}
 
   structured-clone-es@2.0.1: {}
 
