@@ -2112,13 +2112,15 @@ blokir, 2 alasan berbeda tapi efek sama):
   set password + ganti connection string, seharusnya cepat begitu user
   yang jalankan.
 
-**Item yang masih perlu keputusan/input user** (bukan blocker teknis,
-tapi butuh preferensi/kredensial yang tidak saya punya):
-- Self-service password reset via email — butuh kredensial SMTP (host,
-  port, user, password, alamat pengirim). Belum ditanyakan/dikerjakan di
-  putaran ini, nunggu user putuskan mau pakai layanan apa (atau skip
-  kalau memang tidak perlu untuk skala saat ini — `pnpm reset-password`
-  CLI tetap ada sebagai jalur darurat).
+**Self-service password reset via email — user memutuskan SKIP** (bukan
+belum sempat — keputusan sadar dikonfirmasi 2026-09-15, sama sifatnya
+dengan keputusan skip lain di dokumen ini seperti i18n/multisite). Alasan:
+tidak sepadan urus kredensial SMTP untuk skala saat ini. `pnpm
+reset-password <email> <password>` CLI (Pekerjaan #4) TETAP jadi satu-satunya
+jalur reset password darurat — kalau nanti kebutuhan berubah (misal jumlah
+sekolah yang pakai CMS ini bertambah banyak dan admin lupa password jadi
+sering terjadi), ini bisa direvisit; sampai saat itu jangan bangun ulang
+tanpa ditanya dulu.
 
 ## Git
 
