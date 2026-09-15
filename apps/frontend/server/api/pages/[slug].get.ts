@@ -1,4 +1,4 @@
-import { contentService, mediaService, seoService } from "@selftaught/core/server";
+import { contentService, mediaService, reusableBlockService, seoService } from "@selftaught/core/server";
 
 export default defineEventHandler(async (event) => {
   const slug = getRouterParam(event, "slug");
@@ -11,13 +11,14 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 404, statusMessage: "Page not found" });
   }
 
-  const [featuredMedia, resolvedSeo] = await Promise.all([
+  const [featuredMedia, resolvedSeo, resolvedContent] = await Promise.all([
     page.featuredMediaId ? mediaService.getByIdWithUrl(page.featuredMediaId) : null,
-    seoService.resolve(page)
+    seoService.resolve(page),
+    reusableBlockService.resolveDocument(page.content)
   ]);
 
   const seo = { ...resolvedSeo, ogImageUrl: resolvedSeo.ogImageUrl ?? featuredMedia?.url ?? null };
   const jsonLd = await seoService.generateJsonLd(page, seo);
 
-  return { ...page, featuredMediaUrl: featuredMedia?.url ?? null, seo, jsonLd };
+  return { ...page, content: resolvedContent, featuredMediaUrl: featuredMedia?.url ?? null, seo, jsonLd };
 });

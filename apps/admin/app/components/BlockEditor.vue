@@ -4,13 +4,14 @@ import Image from "@tiptap/extension-image";
 import StarterKit from "@tiptap/starter-kit";
 import { EditorContent, useEditor } from "@tiptap/vue-3";
 import { watch } from "vue";
+import { ReusableBlockRef } from "./reusable-block-extension";
 
 const props = defineProps<{ modelValue: ContentDocument }>();
 const emit = defineEmits<{ "update:modelValue": [ContentDocument] }>();
 
 const editor = useEditor({
   content: props.modelValue,
-  extensions: [StarterKit, Image],
+  extensions: [StarterKit, Image, ReusableBlockRef],
   editorProps: {
     attributes: {
       class: "prose prose-slate dark:prose-invert max-w-none focus:outline-none min-h-[18rem] px-4 py-3"
@@ -35,6 +36,57 @@ watch(
 function insertImage() {
   const url = window.prompt("URL gambar:");
   if (url) editor.value?.chain().focus().setImage({ src: url }).run();
+}
+
+interface ReusableBlockSummary {
+  id: string;
+  title: string;
+}
+
+const insertPickerOpen = ref(false);
+const reusableBlocks = ref<ReusableBlockSummary[]>([]);
+const savingReusable = ref(false);
+
+async function saveAsReusableBlock() {
+  const e = editor.value;
+  if (!e) return;
+  const { from, to } = e.state.selection;
+  if (from === to) {
+    window.alert("Pilih (blok) konten dulu sebelum menyimpan sebagai reusable block.");
+    return;
+  }
+  const title = window.prompt("Judul untuk reusable block ini:");
+  if (!title) return;
+
+  savingReusable.value = true;
+  try {
+    const slice = e.state.doc.cut(from, to).toJSON() as { content?: unknown[] };
+    const created = await apiFetch<ReusableBlockSummary>("/api/reusable-blocks", {
+      method: "POST",
+      body: { title, content: { version: 1, type: "doc", content: slice.content ?? [] } }
+    });
+    e.chain()
+      .focus()
+      .deleteRange({ from, to })
+      .insertContentAt(from, { type: "reusableBlockRef", attrs: { reusableBlockId: created.id } })
+      .run();
+  } finally {
+    savingReusable.value = false;
+  }
+}
+
+async function openInsertPicker() {
+  reusableBlocks.value = await apiFetch<ReusableBlockSummary[]>("/api/reusable-blocks");
+  insertPickerOpen.value = true;
+}
+
+function insertReusableBlock(id: string) {
+  editor.value
+    ?.chain()
+    .focus()
+    .insertContent({ type: "reusableBlockRef", attrs: { reusableBlockId: id } })
+    .run();
+  insertPickerOpen.value = false;
 }
 
 interface ToolbarButton {
@@ -67,6 +119,10 @@ const toolbarGroups = computed<ToolbarButton[][]>(() => {
     [
       { icon: "i-lucide-image", label: "Sisipkan gambar", active: () => false, action: insertImage },
       { icon: "i-lucide-minus", label: "Garis pemisah", active: () => false, action: () => e.chain().focus().setHorizontalRule().run() }
+    ],
+    [
+      { icon: "i-lucide-save", label: "Simpan sebagai reusable block", active: () => false, action: saveAsReusableBlock },
+      { icon: "i-lucide-blocks", label: "Sisipkan reusable block", active: () => false, action: openInsertPicker }
     ],
     [
       { icon: "i-lucide-undo-2", label: "Undo", active: () => false, action: () => e.chain().focus().undo().run() },
@@ -105,5 +161,22 @@ const toolbarGroups = computed<ToolbarButton[][]>(() => {
     </div>
 
     <EditorContent :editor="editor" />
+
+    <UModal v-model:open="insertPickerOpen" title="Sisipkan reusable block">
+      <template #body>
+        <ul v-if="reusableBlocks.length" class="space-y-1">
+          <li v-for="block in reusableBlocks" :key="block.id">
+            <button
+              type="button"
+              class="w-full text-left rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              @click="insertReusableBlock(block.id)"
+            >
+              {{ block.title }}
+            </button>
+          </li>
+        </ul>
+        <p v-else class="text-sm text-slate-400 py-4 text-center">Belum ada reusable block. Pilih konten di editor lalu klik "Simpan sebagai reusable block".</p>
+      </template>
+    </UModal>
   </UCard>
 </template>

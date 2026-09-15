@@ -1,12 +1,13 @@
 import { and, count as countRows, desc, eq, ilike, lte, or } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { content } from "../../db/schema/content";
+import { reusableBlockUsages } from "../../db/schema/reusable-blocks";
 import type { RevisionService } from "../../domain/revisions/revision-service";
 import { CapabilityError, NotFoundError, TransitionError, ValidationError } from "../../errors";
 import { hooks } from "../../hooks/hook-bus";
 import type { CapabilityKey } from "../../registry/capabilities";
 import { type ContentTypeDefinition, contentTypeRegistry } from "../../registry/content-types";
-import { extractPlainText, type ContentDocument } from "../../shared/content-doc";
+import { extractPlainText, extractReusableBlockRefs, type ContentDocument } from "../../shared/content-doc";
 import type { Actor } from "../../shared/types";
 
 type ContentRow = typeof content.$inferSelect;
@@ -82,6 +83,7 @@ export class ContentService {
     if (!row) {
       throw new Error("Failed to create content");
     }
+    await this.syncReusableBlockUsages(row.id, input.content);
     return row;
   }
 
@@ -110,7 +112,19 @@ export class ContentService {
     if (!row) {
       throw new Error("Failed to update content");
     }
+    if (input.content) {
+      await this.syncReusableBlockUsages(row.id, input.content);
+    }
     return row;
+  }
+
+  /** Re-derives which reusable blocks this content references, every save -- a plain table write, no ReusableBlockService dependency needed (see reusable-blocks.ts schema comment). */
+  private async syncReusableBlockUsages(contentId: string, doc: ContentDocument): Promise<void> {
+    await this.db.delete(reusableBlockUsages).where(eq(reusableBlockUsages.contentId, contentId));
+    const refs = extractReusableBlockRefs(doc);
+    if (refs.length > 0) {
+      await this.db.insert(reusableBlockUsages).values(refs.map((reusableBlockId) => ({ reusableBlockId, contentId })));
+    }
   }
 
   async transitionStatus(
@@ -236,6 +250,7 @@ export class ContentService {
     if (!row) {
       throw new Error("Failed to restore revision");
     }
+    await this.syncReusableBlockUsages(row.id, revision.content);
     return row;
   }
 
@@ -293,6 +308,7 @@ export class ContentService {
     if (!row) {
       throw new Error("Failed to duplicate content");
     }
+    await this.syncReusableBlockUsages(row.id, existing.content);
     return row;
   }
 

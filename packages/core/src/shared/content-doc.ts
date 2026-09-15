@@ -61,3 +61,18 @@ export function extractPlainText(doc: ContentDocument): string {
   walk(doc.content);
   return parts.join(" ");
 }
+
+/** Collects every reusableBlockId referenced anywhere in the tree (deduped) -- used by ContentService to keep reusable_block_usages in sync on every save (Phase 17). */
+export function extractReusableBlockRefs(doc: ContentDocument): string[] {
+  const ids = new Set<string>();
+  function walk(nodes: BlockNode[]) {
+    for (const node of nodes) {
+      if (node.type === "reusableBlockRef" && typeof node.attrs?.reusableBlockId === "string") {
+        ids.add(node.attrs.reusableBlockId);
+      }
+      if (node.content) walk(node.content);
+    }
+  }
+  walk(doc.content);
+  return [...ids];
+}

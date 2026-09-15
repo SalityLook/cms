@@ -18,6 +18,7 @@ const contentNav: NavItem[] = [
   { label: "Categories", to: "/categories", icon: "i-lucide-folder" },
   { label: "Tags", to: "/tags", icon: "i-lucide-tag" },
   { label: "Comments", to: "/comments", icon: "i-lucide-message-square" },
+  { label: "Reusable Blocks", to: "/reusable-blocks", icon: "i-lucide-blocks" },
   { label: "Trash", to: "/trash", icon: "i-lucide-trash-2" }
 ];
 

@@ -2,6 +2,7 @@ export * from "./comments";
 export * from "./content";
 export * from "./media";
 export * from "./menus";
+export * from "./reusable-blocks";
 export * from "./revisions";
 export * from "./seo";
 export * from "./settings";
