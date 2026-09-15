@@ -1474,6 +1474,63 @@ terhapus, admin asli tidak tersentuh). Typecheck/lint/test (29/29) bersih,
 CSS bundle re-check (Gotcha #21). Build kedua app + `pm2 restart` — live
 di kedua domain, tenant lain di VPS ini tidak terganggu.
 
+### Phase 15 — Full-text search (selesai)
+
+`content` dapat kolom baru `contentText` (plain text hasil `extractPlainText()`
+baru di `shared/content-doc.ts` — jalan tree block, gabungkan semua text
+node — dipanggil dari `ContentService.create()`/`update()`/`restoreRevision()`)
+plus generated column `search_tsv tsvector` (migration `0009`, GIN index)
+yang hitung `to_tsvector('simple', title || excerpt || content_text)`.
+`search_tsv` SENGAJA TIDAK dideklarasikan di Drizzle schema TS sama sekali
+(write-never, cuma pernah dibaca) — `SearchService` satu-satunya consumer,
+akses lewat `db.execute(sql\`...\`)` mentah, bukan query builder.
+
+`SearchService.search(query, {type?, limit, offset})` — `plainto_tsquery`
+terhadap `search_tsv`, filter `status='published'`, urut `ts_rank`,
+snippet dari `ts_headline` native Postgres. Teks query SELALU dikirim
+sebagai bound parameter (bukan concat string) walau `plainto_tsquery`
+sendiri sudah kecil kemungkinan disuntik. **Mitigasi XSS yang WAJIB
+ada**: output `ts_headline` di-render di publik lewat `v-html` (perlu,
+supaya tag `<b>` highlight-nya jalan) — jadi teks `excerpt`/`content_text`
+mentah DI-ESCAPE (`&`/`<`/`>`) SEBELUM masuk `ts_headline`, supaya
+`<script>` literal yang (sengaja/tidak sengaja) ke-ketik penulis di field
+excerpt tidak pernah bisa eksekusi di browser pengunjung yang query-nya
+match. Diverifikasi NYATA (bukan diasumsikan): post dengan excerpt berisi
+`<script>alert(1)</script>` balik dari API sebagai string ter-escape aman
+plus tag `<b>` asli dari `ts_headline` yang TIDAK ikut ter-escape (hasil
+highlight tetap tampil).
+
+Endpoint baru `GET /api/search` di `apps/frontend` (rate-limited
+30/menit/IP, pattern sama `checkRateLimit` komentar/login), halaman
+publik baru `themes/default/app/pages/search.vue`, search box
+`<form method="get">` server-rendered di header theme (desktop) + icon
+cari yang link ke `/search` (mobile) — tanpa JS wajib, konsisten filosofi
+theme.
+
+**Bug nyata ketemu sebelum deploy, DARI verifikasi SSR bukan
+typecheck/lint (keduanya hijau)**: edit header theme untuk nambah search
+box meninggalkan satu `<div>` wrapper mobile-nav baru TANPA tag penutup —
+cuma muncul sebagai Vue compiler error 500 saat SSR (`curl` halaman HTML),
+sama sekali tidak terdeteksi `nuxt typecheck`/`eslint`. Contoh lain
+disiplin Gotcha #17 ("typecheck lolos ≠ runtime benar") terbukti berguna.
+
+**Catatan proses login testing**: pola user QA sekali-pakai dari Phase 14
+diulang di sini juga (dibuat, dipakai, dihapus — kredensial admin
+produksi tidak pernah disentuh).
+
+**Diverifikasi runtime**: publish post+page dengan keyword beda → search
+balikin keduanya dengan `ts_rank` benar + snippet ter-highlight benar →
+draft dengan keyword SAMA seperti post published → **TERBUKTI absen
+total** dari hasil search → verifikasi kamus `simple` (tanpa stemming):
+query yang butuh token "search" DAN "test" secara literal benar menolak
+post yang cuma punya "search testing" (bukan bug — "testing" ≠ "test"
+tanpa stemming) → query kosong/aneh → 200 hasil kosong (bukan 500) →
+pagination halaman di luar range graceful → rate limit kena di request
+~30 dalam 1 menit. Cleanup total (`content` count 0, user QA terhapus).
+Typecheck/lint/test (29/29) bersih, CSS bundle re-check (71KB→72KB,
+Gotcha #21). Build kedua app + `pm2 restart` — live di kedua domain,
+tenant lain di VPS ini tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
