@@ -118,6 +118,27 @@ export class ContentService {
     return row;
   }
 
+  /**
+   * Deliberately separate from update() -- does NOT touch the main
+   * `content` row (title/slug/updatedAt), so it never interferes with a
+   * concurrent manual save or with the list pages' "Diperbarui" ordering.
+   * An autosave is just a revision row tagged "autosave" (RevisionService
+   * keeps exactly one per content).
+   */
+  async autosave(actor: Actor, id: string, input: { title: string; excerpt?: string | null; content: ContentDocument }) {
+    const existing = await this.requireExisting(id);
+    const definition = this.requireContentType(existing.type);
+    this.assertOwnershipOrCapability(actor, existing, definition);
+
+    return this.revisions.upsertAutosave({
+      contentId: id,
+      authorId: actor.id,
+      title: input.title,
+      excerpt: input.excerpt,
+      content: input.content
+    });
+  }
+
   /** Re-derives which reusable blocks this content references, every save -- a plain table write, no ReusableBlockService dependency needed (see reusable-blocks.ts schema comment). */
   private async syncReusableBlockUsages(contentId: string, doc: ContentDocument): Promise<void> {
     await this.db.delete(reusableBlockUsages).where(eq(reusableBlockUsages.contentId, contentId));

@@ -18,6 +18,9 @@ const mediaItems = computed(() => mediaData.value?.items ?? []);
 const { data: categories } = await useApiFetch<TermSummary[]>("/api/taxonomy/category");
 const { data: tags } = await useApiFetch<TermSummary[]>("/api/taxonomy/tag");
 const { data: revisions, refresh: refreshRevisions } = await useApiFetch<RevisionSummary[]>(`/api/posts/${id}/revisions`);
+const { data: autosaveRevision, refresh: refreshAutosave } = await useApiFetch<RevisionSummary | null>(
+  `/api/posts/${id}/revisions/autosave`
+);
 const { data: seo } = await useApiFetch<ContentSeo | null>(`/api/posts/${id}/seo`);
 
 const title = ref(post.value.title);
@@ -91,6 +94,7 @@ async function onSave() {
       })
     ])
   );
+  lastAutosavedSnapshot = JSON.stringify({ title: title.value, excerpt: excerpt.value, doc: doc.value });
   saving.value = false;
 }
 
@@ -115,6 +119,53 @@ async function onRestoreRevision(revisionId: string) {
     slug.value = post.value.slug;
     excerpt.value = post.value.excerpt ?? "";
     doc.value = post.value.content as ContentDocument;
+  }
+  await refreshAutosave();
+}
+
+// Autosave: only fires when something actually changed since the last autosave/manual save,
+// and never touches the main content row (PATCH) -- see ContentService.autosave().
+const lastAutosavedAt = ref<Date | null>(null);
+let lastAutosavedSnapshot = JSON.stringify({ title: title.value, excerpt: excerpt.value, doc: doc.value });
+
+async function runAutosave() {
+  const snapshot = JSON.stringify({ title: title.value, excerpt: excerpt.value, doc: doc.value });
+  if (snapshot === lastAutosavedSnapshot) return;
+  await apiFetch(`/api/posts/${id}/autosave`, {
+    method: "PUT",
+    body: { title: title.value || "(Tanpa judul)", excerpt: excerpt.value || undefined, content: doc.value }
+  });
+  lastAutosavedSnapshot = snapshot;
+  lastAutosavedAt.value = new Date();
+  await refreshAutosave();
+}
+
+let autosaveInterval: ReturnType<typeof setInterval> | undefined;
+onMounted(() => {
+  autosaveInterval = setInterval(runAutosave, 30_000);
+});
+onBeforeUnmount(() => clearInterval(autosaveInterval));
+
+async function onRestoreAutosave() {
+  if (!autosaveRevision.value) return;
+  await onRestoreRevision(autosaveRevision.value.id);
+}
+
+const diffOpen = ref(false);
+const diffParts = ref<{ value: string; added?: boolean; removed?: boolean }[]>([]);
+const diffLoading = ref(false);
+
+async function onViewDiff(revisionId: string) {
+  diffOpen.value = true;
+  diffLoading.value = true;
+  try {
+    const result = await apiFetch<{ parts: { value: string; added?: boolean; removed?: boolean }[] }>(
+      `/api/posts/${id}/revisions/diff`,
+      { query: { from: revisionId, to: "current" } }
+    );
+    diffParts.value = result.parts;
+  } finally {
+    diffLoading.value = false;
   }
 }
 
@@ -145,6 +196,9 @@ async function onDelete() {
         <UButton color="error" icon="i-lucide-trash-2" @click="onDelete">Hapus Permanen</UButton>
       </div>
       <div v-else class="flex items-center gap-2 flex-wrap shrink-0">
+        <span v-if="lastAutosavedAt" class="text-xs text-slate-400">
+          Tersimpan otomatis pukul {{ lastAutosavedAt.toLocaleTimeString() }}
+        </span>
         <UButton variant="ghost" color="neutral" :loading="saving" icon="i-lucide-save" @click="onSave">Simpan</UButton>
 
         <UButton v-if="post?.status === 'draft'" color="neutral" variant="outline" @click="onSubmit">Ajukan Review</UButton>
@@ -305,15 +359,52 @@ async function onDelete() {
           <template #header>
             <h2 class="font-semibold text-slate-900 dark:text-white text-sm">Revisions</h2>
           </template>
+
+          <UAlert
+            v-if="autosaveRevision"
+            color="warning"
+            variant="subtle"
+            title="Ada autosave yang belum disimpan manual"
+            :description="`Tersimpan otomatis: ${new Date(autosaveRevision.createdAt).toLocaleString()}`"
+            class="mb-3"
+          >
+            <template #actions>
+              <UButton size="xs" variant="solid" @click="onRestoreAutosave">Pulihkan dari autosave</UButton>
+            </template>
+          </UAlert>
+
           <ul class="divide-y divide-slate-100 dark:divide-slate-800">
             <li v-for="rev in revisions" :key="rev.id" class="py-2.5 flex items-center justify-between gap-2">
               <span class="text-xs text-slate-500 truncate">{{ rev.title }} — {{ new Date(rev.createdAt).toLocaleString() }}</span>
-              <UButton size="xs" variant="outline" class="shrink-0" @click="onRestoreRevision(rev.id)">Pulihkan</UButton>
+              <div class="flex items-center gap-1 shrink-0">
+                <UButton size="xs" variant="ghost" color="neutral" @click="onViewDiff(rev.id)">Diff</UButton>
+                <UButton size="xs" variant="outline" @click="onRestoreRevision(rev.id)">Pulihkan</UButton>
+              </div>
             </li>
             <li v-if="!revisions?.length" class="py-4 text-center text-slate-400 text-sm">Belum ada revisi tersimpan.</li>
           </ul>
         </UCard>
       </div>
     </div>
+
+    <USlideover v-model:open="diffOpen" :ui="{ content: 'w-full max-w-xl' }">
+      <template #content>
+        <div class="p-4">
+          <h2 class="font-semibold text-slate-900 dark:text-white mb-4">Diff: revisi vs konten saat ini</h2>
+          <p v-if="diffLoading" class="text-sm text-slate-400">Memuat...</p>
+          <p v-else-if="!diffParts.length" class="text-sm text-slate-400">Tidak ada perbedaan teks.</p>
+          <p v-else class="text-sm leading-relaxed">
+            <span
+              v-for="(part, i) in diffParts"
+              :key="i"
+              :class="{
+                'bg-green-100 dark:bg-green-950 text-green-800 dark:text-green-300 underline': part.added,
+                'bg-red-100 dark:bg-red-950 text-red-800 dark:text-red-300 line-through': part.removed
+              }"
+            >{{ part.value }}</span>
+          </p>
+        </div>
+      </template>
+    </USlideover>
   </div>
 </template>

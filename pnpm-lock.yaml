@@ -295,6 +295,9 @@ importers:
       argon2:
         specifier: ^0.41.1
         version: 0.41.1
+      diff:
+        specifier: ^7.0.0
+        version: 7.0.0
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.2(gel@2.2.0(supports-color@10.2.2))(postgres@3.4.9)
@@ -311,6 +314,9 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
     devDependencies:
+      '@types/diff':
+        specifier: ^7.0.2
+        version: 7.0.2
       drizzle-kit:
         specifier: ^0.31.10
         version: 0.31.10
@@ -2346,6 +2352,9 @@ packages:
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
+  '@types/diff@7.0.2':
+    resolution: {integrity: sha512-JSWRMozjFKsGlEjiiKajUjIJVKuKdE3oVy2DNtK+fUo8q82nhFZ2CPQwicAIkXrofahDXrWJ7mjelvZphMS98Q==}
+
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
@@ -3345,6 +3354,10 @@ packages:
 
   dfa@1.2.0:
     resolution: {integrity: sha512-ED3jP8saaweFTjeGX8HQPjeC1YYyZs98jGNZx6IiBvxW7JG5v492kamAQB3m2wop07CvU/RQmzcKr6bgcC5D/Q==}
+
+  diff@7.0.0:
+    resolution: {integrity: sha512-PJWHUb1RFevKCwaFA9RlG5tCd+FO5iRh9A8HEtkmBH2Li03iJriB6m6JIN4rGz3K3JLawI7/veA1xzRKP6ISBw==}
+    engines: {node: '>=0.3.1'}
 
   diff@8.0.4:
     resolution: {integrity: sha512-DPi0FmjiSU5EvQV0++GFDOJ9ASQUVFh5kD+OzOnYdi7n3Wpm9hWWGfB/O2blfHcMVTL5WkQXSnRiK9makhrcnw==}
@@ -8409,6 +8422,8 @@ snapshots:
 
   '@types/deep-eql@4.0.2': {}
 
+  '@types/diff@7.0.2': {}
+
   '@types/estree@1.0.9': {}
 
   '@types/json-schema@7.0.15': {}
@@ -9396,6 +9411,8 @@ snapshots:
   devalue@5.9.2: {}
 
   dfa@1.2.0: {}
+
+  diff@7.0.0: {}
 
   diff@8.0.4: {}
 
