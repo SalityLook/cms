@@ -1721,6 +1721,63 @@ core/admin/frontend, `pnpm test` 29/29. Build kedua app + CSS bundle
 re-check (Gotcha #21, 72KB→72.6KB) + `pm2 restart` — live di kedua
 domain, tenant lain tidak terganggu.
 
+### Phase 20 — Import/Export (JSON backup/restore + WXR best-effort) (selesai)
+
+Capability baru `manage_import_export`, SENGAJA terpisah dari
+`manage_settings` — dump/restore data penuh cukup sensitif untuk gate
+sendiri, cuma role `admin` yang dapat secara default (editor tidak).
+
+`ExportService.exportAll()` — bundle JSON versioned (content, terms,
+metadata media, comments). Cross-reference dipakai KEY PORTABLE, bukan
+DB id (id tidak pernah survive siklus delete-lalu-reimport, apalagi
+instance beda): parent/term content pakai slug, link media pakai
+`fileName` storage, threading comment pakai posisi ordinal di array
+export. Scope v1 (sesuai plan): media cuma metadata + path relatif
+storage, TIDAK bundling byte file binary-nya.
+
+`ImportService.importJson()` recreate lewat `ContentService.create()`/
+`TaxonomyService.createTerm()` (semua validasi/capability normal tetap
+berlaku), **skip** (bukan duplikat) content yang `(type,slug)` sudah ada
+atau term yang `(taxonomy,slug)` sudah ada. `ContentService.setStatusUnchecked()`
+baru (system-level, tanpa actor check, pola sama `publishDueScheduled()`)
+mengembalikan status/publishedAt asli row yang diimport (create() selalu
+mulai row sebagai draft). Comment ditulis LANGSUNG ke tabel (skip guard
+published-only `CommentService.create()` — pantas untuk bulk restore
+terpercaya) dan di-dedup by `(contentId, authorEmail, body, createdAt)`.
+
+**Bug idempotency nyata ketemu DARI verifikasi fase ini sendiri**: draft
+pertama comment TIDAK punya existence-check sama sekali — import ulang
+export yang sama menduplikasi SETIAP comment di tiap run, sementara
+content/terms sudah benar no-op. Di-fix (dedup key di atas) dan
+diverifikasi ulang sebelum lanjut.
+
+`ImportService.importWxr()` parse WXR WordPress (dependency baru
+`fast-xml-parser`) jadi bentuk bundle yang SAMA, lewat jalur pembuatan
+content yang IDENTIK. Best-effort/lossy secara eksplisit, dinyatakan
+jelas di copy UI: cuma item post/page yang diimport (attachment/nav-menu-
+item di-skip); HTML body lewat `htmlToBlocks()` baru yang cuma kenal tag
+top-level `<p>`/`<h1-6>`, sisanya di-strip ke plain text (tidak preserve
+shortcode/gallery/Gutenberg block); nama kategori/tag survive tapi
+hierarki, featured-image attachment, postmeta, author mapping TIDAK.
+
+Halaman admin baru `/import-export`: tombol export (download file JSON
+browser), input file JSON dengan preview pre-commit (hitung create/skip
+per koleksi SEBELUM nulis apa pun) + langkah konfirmasi, input file WXR
+dengan ringkasan hasil sendiri.
+
+**Diverifikasi runtime**: bikin situs kecil (post+page+category+tag+1
+comment via endpoint publik) → export → hapus semua → reimport →
+status/slug/term-link/atribusi comment SEMUA cocok → reimport LAGI file
+export yang SAMA → idempotent sungguhan (0 created, semua skip, termasuk
+comment setelah fix) → import sample WXR (post h2+2 paragraf+category+tag,
+page draft, 1 attachment) → attachment ke-skip benar (2 content dibuat,
+bukan 3), status mapping benar, HTML jadi heading+2 paragraph block
+dengan `<strong>` ter-strip ke plain text sesuai dokumentasi. Cleanup
+total (semua count 0, user QA terhapus). Typecheck/lint bersih di
+core/admin, `pnpm test` 29/29. Build+deploy **admin saja** (`pm2 restart
+selftaught-admin` — frontend/theme tidak disentuh fase ini), live, tenant
+lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
