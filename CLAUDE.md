@@ -1531,6 +1531,39 @@ Typecheck/lint/test (29/29) bersih, CSS bundle re-check (71KB→72KB,
 Gotcha #21). Build kedua app + `pm2 restart` — live di kedua domain,
 tenant lain di VPS ini tidak terganggu.
 
+### Phase 16 — Duplicate post/page (selesai)
+
+`ContentService.duplicate(actor, id)` — copy row `content` itu sendiri
+saja (title dapat suffix " (Copy)", slug dibuat unik dengan append
+`-copy`/`-copy-N` sampai tidak collision, status DIPAKSA `draft` walau
+sumbernya published, revisi TIDAK ikut disalin — duplikat mulai histori
+sendiri). Ownership ditegakkan pola sama seperti `update()`
+(`assertOwnershipOrCapability` — butuh `edit_others_posts`/`edit_pages`
+kalau bukan pemilik source).
+
+**Keputusan desain**: menyalin row terkait (terms, `content_meta`, SEO)
+SENGAJA dilakukan di level API route (`POST /api/posts/[id]/duplicate` +
+`/api/pages/[id]/duplicate` baru), pakai service per-concern yang sudah
+ada (`taxonomyService`/`contentMetaService`/`seoService`) — BUKAN nambah
+dependency ke constructor `ContentService`. Ini konsisten dengan pola yang
+sudah ada di codebase: SEO sudah punya endpoint PUT sendiri, tidak
+di-merge ke `update()`.
+
+Admin UI: kolom aksi "Duplikat" baru di tabel list posts DAN pages
+(`AdminDataTable` `columnsCount` naik 3→4) — klik langsung duplikat lalu
+navigasi ke editor draft hasil duplikat.
+
+**Diverifikasi runtime**: duplikat post lengkap (kategori+tag+custom
+field+SEO override) → hasil draft, slug unik, terms/meta/SEO sama persis,
+0 revisi, id/createdAt beda → duplikat DARI hasil duplikat (chained) →
+slug tetap tidak collision (`-copy-copy`, bukan bentrok) → sebagai
+`author` TANPA `edit_others_posts`, duplikat post user lain → 403 →
+duplikat post miliknya sendiri → 200 sukses. Cleanup total (`content`
+count 0, kedua user QA terhapus). Typecheck/lint bersih di core/admin,
+`pnpm test` 29/29. Build+deploy **admin saja** (`pm2 restart
+selftaught-admin` — frontend/theme tidak disentuh fase ini), live, tenant
+lain tidak terganggu.
+
 ## Git
 
 Repo sudah `git init` (local repo, belum ada remote). Identitas git di-set lokal
