@@ -47,8 +47,18 @@ ProseMirror, TypeScript end-to-end).
 - **Production hardening** — rate limiting login (per-IP & per-email),
   validasi tipe/ukuran file upload, HTTP status code presisi untuk error
   domain (400/403/404/409, bukan 500 generik), dependency audit bersih dari
-  celah kritis/high, CI (lint/typecheck/test/build/audit), dan tooling
-  backup/restore + reset password darurat
+  celah kritis/high, CI (lint/typecheck/test/build/audit), structured
+  logging (pino), dan tooling backup/restore + reset password darurat
+- **Kesetaraan fitur WordPress (native, tanpa plugin eksternal)** —
+  full-text search, custom menus navigasi, kategori hierarkis, custom
+  fields generik, duplicate post/page, reusable blocks tersinkron (edit
+  sekali, update di semua tempat yang memakainya), autosave + revision
+  diff, komentar (moderasi + threaded reply + rate limit), self-registration
+  publik dengan profil penulis (`/author/[slug]`), import/export
+  (JSON idempotent + WXR WordPress best-effort), toggle plugin/theme dari
+  UI, two-factor authentication (TOTP + recovery code), REST API publik
+  v1 (read-only + comment submission via API key), dan oEmbed (YouTube/
+  Vimeo/SoundCloud/CodePen, allowlist + sanitized + cached)
 
 ## Tech stack
 
@@ -332,6 +342,14 @@ ke `AdminUIRegistry`.
 
 ## Dokumentasi lanjutan
 
+- [`docs/user-guide.md`](./docs/user-guide.md) — **panduan penggunaan**
+  untuk admin/editor/penulis yang memakai dashboard sehari-hari: login,
+  menulis & publish konten, block editor, reusable blocks, custom fields,
+  kategori/tag, media, komentar, menu navigasi, SEO, 2FA, API key,
+  import/export, dan lainnya. Mulai dari sini kalau Anda pengguna CMS ini,
+  bukan yang meng-install/deploy-nya.
+- [`docs/api.md`](./docs/api.md) — dokumentasi REST API publik v1
+  (read-only + comment submission via API key).
 - [`CLAUDE.md`](./CLAUDE.md) — ringkasan arsitektur lengkap, status tiap fase
   pengembangan, daftar gotcha teknis yang sudah pernah ditemukan (baca ini
   dulu sebelum debugging masalah build/typecheck/SSR yang aneh), dan daftar
@@ -340,12 +358,19 @@ ke `AdminUIRegistry`.
 ## Status proyek
 
 Semua 8 fase roadmap awal (scaffolding, auth/RBAC, content & block editor,
-taxonomy & media, revisions & publishing workflow, SEO, theme layer, hook/
-plugin system) sudah selesai, ditambah lima penyempurnaan pasca-roadmap:
-halaman admin Users & Roles, automated test suite, CRUD penuh untuk content
-type "page" (termasuk hierarki parent/menu order), production hardening
-(rate limiting, validasi upload, status code presisi, dependency audit,
-CI, backup/restore), dan **deployment produksi live** di
-https://self-taught.my.id. Beberapa item kecil masih sengaja belum dibangun
-(static front page homepage, pembuatan role custom lewat UI, dsb.) — daftar
-lengkap beserta cara melanjutkannya ada di bagian akhir `CLAUDE.md`.
+taxonomy & media, revisions & publishing workflow, SEO, theme layer,
+hook/plugin system) sudah selesai, ditambah rangkaian penyempurnaan
+pasca-roadmap: halaman admin Users & Roles, automated test suite, CRUD
+penuh untuk content type "page", production hardening (rate limiting,
+validasi upload, status code presisi, dependency audit, CI,
+backup/restore, structured logging), UI/UX redesign penuh + branding
+per-instalasi, **deployment produksi live** di https://self-taught.my.id,
+dan 15 fase lanjutan yang menutup gap fitur ala WordPress secara native
+(search, custom menus, kategori hierarkis, custom fields, duplicate
+content, reusable blocks tersinkron, autosave+revision diff,
+self-registration+profil publik, import/export, toggle plugin/theme,
+2FA, REST API publik v1, oEmbed) — lihat [`docs/user-guide.md`](./docs/user-guide.md)
+untuk cara memakai semuanya. Beberapa item kecil masih sengaja belum
+dibangun (static front page homepage, pembuatan role custom lewat UI,
+i18n, multisite, dsb.) — daftar lengkap beserta alasannya ada di bagian
+akhir `CLAUDE.md`.
